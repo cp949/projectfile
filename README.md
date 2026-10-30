@@ -17,6 +17,10 @@ ZIP 메타데이터와 `manifest.json` 본문을 섞는(scramble) 목적은 인�
 | 경로                   | 패키지               | 내용                          |
 | ---------------------- | -------------------- | ----------------------------- |
 | `packages/projectfile` | `@cp949/projectfile` | 프로젝트 파일 인코더와 디코더 |
+| `apps/basic`           | `example-basic`      | 기본 scramble 키 사용 예제    |
+| `apps/custom-key`      | `example-custom-key` | 사용처 scramble 키 사용 예제  |
+
+`apps/`의 예제는 배포하지 않는다(`private: true`). 실행 방법은 각 예제의 README에 있다.
 
 ## 명령
 

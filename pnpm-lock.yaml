@@ -179,6 +179,26 @@ importers:
         specifier: 2.11.10
         version: 2.11.10
 
+  apps/basic:
+    dependencies:
+      '@cp949/projectfile':
+        specifier: workspace:*
+        version: link:../../packages/projectfile
+    devDependencies:
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
+  apps/custom-key:
+    dependencies:
+      '@cp949/projectfile':
+        specifier: workspace:*
+        version: link:../../packages/projectfile
+    devDependencies:
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
   packages/projectfile:
     dependencies:
       fflate:
