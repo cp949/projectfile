@@ -422,7 +422,7 @@ pnpm --filter @cp949/projectfile check:escompat
 
 - `exports`는 `dist`를 가리킨다. 소비하기 전에 `build`가 필요하다.
 - `check:escompat`은 `dist`를 검사한다. `build` 뒤에 실행한다.
-- `test:browser`는 Chromium에서 `Blob` 경로 시험 일부를 실행한다. Chromium 설치와 범위는 저장소 루트 `README.md`와 `docs/agents/testing.md`에 있다.
+- `test:browser`는 Chromium에서 `Blob` 경로 시험 일부를 실행한다. Chromium 설치와 범위는 저장소 루트 `README.md`와 `docs/agents/extra-checks.md`에 있다.
 - `dist`는 Git에 넣지 않는다.
 - 배포는 `pnpm --filter @cp949/projectfile publish:npm`다. 절차는 `docs/release.md`에 있다.
 

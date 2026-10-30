@@ -54,7 +54,7 @@ pnpm changeset
    - `check:package`는 `npm pack` tarball을 publint와 attw로 검사한다. 네트워크는 필요 없다.
    - 브라우저 시험(`test:browser`)은 `verify`에 들어가지 않아 이 단계에서 돌지 않는다.
    - CI의 `browser` 작업은 push 뒤에 돈다. 배포 커밋의 결과는 6단계 뒤에 나온다.
-   - 배포 전에 확인하려면 로컬에서 `pnpm --filter @cp949/projectfile test:browser`를 실행한다. Chromium 설치가 필요하다. 설치 명령은 `docs/agents/testing.md`의 "브라우저 시험"을 따른다.
+   - 배포 전에 확인하려면 로컬에서 `pnpm --filter @cp949/projectfile test:browser`를 실행한다. Chromium 설치가 필요하다. 설치 명령은 `docs/agents/extra-checks.md`의 "브라우저 시험"을 따른다.
 4. 버전 태그를 만든다. `package.json`의 버전과 맞춘다.
    ```sh
    git tag v<버전>

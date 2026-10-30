@@ -26,7 +26,7 @@
 
 ### 테스트 작성·유지
 
-테스트 작성·유지 기준과 TDD 적용 범위는 `docs/agents/testing.md`를 따른다.
+테스트 작성·유지 기준과 TDD 적용 범위는 `docs/agents/testing.md`를 따른다. 브라우저 시험과 소비·패키지·README 예제 검사의 범위와 규칙은 `docs/agents/extra-checks.md`를 따른다.
 
 ### 도구 이름
 

@@ -44,15 +44,15 @@ pnpm --filter @cp949/projectfile measure:sections
 
 `test:coverage`는 `src`의 커버리지를 터미널과 `packages/projectfile/coverage/`(HTML)에 낸다. `verify`에는 들어가지 않는다.
 
-`check-types`는 `tsc` 두 번에 이어 `packages/projectfile/scripts/check-readme.mjs`를 실행한다. 패키지 README의 `ts` 코드 블록을 타입 검사한다. 범위는 [docs/agents/testing.md](docs/agents/testing.md)의 "README 예제 검사"에 있다.
+`check-types`는 `tsc` 두 번에 이어 `packages/projectfile/scripts/check-readme.mjs`를 실행한다. 패키지 README의 `ts` 코드 블록을 타입 검사한다. 범위는 [docs/agents/extra-checks.md](docs/agents/extra-checks.md)의 "README 예제 검사"에 있다.
 
 `check:escompat`은 `build`가 만든 `dist`가 Chrome 75 문법(ES2019)인지 검사한다. 기준은 [packages/projectfile/README.md](packages/projectfile/README.md)의 "지원 환경"이다.
 
 `check:license`는 루트 `LICENSE`와 `packages/projectfile/LICENSE`가 같은지, `npm pack --dry-run` 파일 목록에 `LICENSE`가 있는지 검사한다. 루트 `LICENSE`가 원본이다. 어긋나면 루트 파일을 패키지 디렉터리로 복사한다.
 
-`check:consume`은 `npm pack` tarball을 임시 디렉터리에 설치하고 패키지 이름으로 import해 왕복 등 최소 검사를 실행한다. 먼저 `pnpm build`가 필요하고 `fflate`를 받으므로 네트워크가 필요하다. tarball 경로를 인자로 주면 pack을 건너뛴다. `verify`에는 들어가지 않고 CI의 `consume` 작업이 Node 버전별로 실행한다. 범위와 이유는 [docs/agents/testing.md](docs/agents/testing.md)의 "소비 검사"에 있다.
+`check:consume`은 `npm pack` tarball을 임시 디렉터리에 설치하고 패키지 이름으로 import해 왕복 등 최소 검사를 실행한다. 먼저 `pnpm build`가 필요하고 `fflate`를 받으므로 네트워크가 필요하다. tarball 경로를 인자로 주면 pack을 건너뛴다. `verify`에는 들어가지 않고 CI의 `consume` 작업이 Node 버전별로 실행한다. 범위와 이유는 [docs/agents/extra-checks.md](docs/agents/extra-checks.md)의 "소비 검사"에 있다.
 
-`check:package`는 `npm pack` tarball을 publint(`--strict`)와 attw로 검사한다. `exports`, `files`, `types`가 가리키는 파일과 node10, node16, bundler 해석별 타입 선언을 본다. 먼저 `pnpm build`가 필요하다. 네트워크는 필요 없다. tarball 경로를 인자로 주면 pack을 건너뛴다. `verify`에는 들어가지 않고 CI의 `verify` 작업이 `pnpm verify` 뒤에 실행한다. 범위와 이유는 [docs/agents/testing.md](docs/agents/testing.md)의 "패키지 검사"에 있다.
+`check:package`는 `npm pack` tarball을 publint(`--strict`)와 attw로 검사한다. `exports`, `files`, `types`가 가리키는 파일과 node10, node16, bundler 해석별 타입 선언을 본다. 먼저 `pnpm build`가 필요하다. 네트워크는 필요 없다. tarball 경로를 인자로 주면 pack을 건너뛴다. `verify`에는 들어가지 않고 CI의 `verify` 작업이 `pnpm verify` 뒤에 실행한다. 범위와 이유는 [docs/agents/extra-checks.md](docs/agents/extra-checks.md)의 "패키지 검사"에 있다.
 
 `measure:ceiling`은 풀린 크기 256 MiB 프로젝트를 시나리오별로 Node와 Chrome에서 인코딩·디코딩해 시간과 메모리를 잰다. Linux에서만 동작한다. 먼저 `pnpm build`가 필요하고 Playwright의 Chromium이 설치되어 있어야 한다. 시나리오 이름을 인자로 주면 그 시나리오만 돈다. `verify`에는 들어가지 않는다. 방법과 결과는 [docs/adr/0001-uncompressed-bytes-ceiling.md](docs/adr/0001-uncompressed-bytes-ceiling.md)에 있다.
 
@@ -62,7 +62,7 @@ pnpm --filter @cp949/projectfile measure:sections
 pnpm --filter @cp949/projectfile exec playwright-core install chromium
 ```
 
-`test:browser`는 `Blob` 읽기 경로 시험 두 파일(`tests/decode-read.test.ts`, `tests/roundtrip.test.ts`)과 `packages/projectfile/tests-browser/`의 시험을 Chromium에서 실행한다. 위 명령으로 설치한 Chromium이 필요하다. `verify`에는 들어가지 않고 CI의 `browser` 작업이 실행한다. 범위와 이유는 [docs/agents/testing.md](docs/agents/testing.md)의 "브라우저 시험"에 있다.
+`test:browser`는 `Blob` 읽기 경로 시험 두 파일(`tests/decode-read.test.ts`, `tests/roundtrip.test.ts`)과 `packages/projectfile/tests-browser/`의 시험을 Chromium에서 실행한다. 위 명령으로 설치한 Chromium이 필요하다. `verify`에는 들어가지 않고 CI의 `browser` 작업이 실행한다. 범위와 이유는 [docs/agents/extra-checks.md](docs/agents/extra-checks.md)의 "브라우저 시험"에 있다.
 
 `pnpm verify`는 `lint`, `format:check`, `check-types`, `test`, `build`, `check:escompat`, `check:license`를 차례로 실행한다. 하나라도 실패하면 멈춘다.
 

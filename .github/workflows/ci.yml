@@ -42,11 +42,11 @@ jobs:
 
       # verify의 build가 만든 dist를 pack해 package.json 메타데이터와 타입 해석을 검사한다.
       # 결과가 Node 버전에 따라 달라지지 않아 matrix를 도는 consume 작업에 넣지 않는다.
-      # 범위와 이유는 docs/agents/testing.md의 "패키지 검사"를 따른다.
+      # 범위와 이유는 docs/agents/extra-checks.md의 "패키지 검사"를 따른다.
       - run: pnpm check:package
 
   # Chromium에서 `Blob` 경로 시험 일부를 돈다. `verify`는 Chromium 다운로드에 의존하지 않으므로 별도 작업으로 둔다.
-  # 범위와 이유는 docs/agents/testing.md의 "브라우저 시험"을 따른다.
+  # 범위와 이유는 docs/agents/extra-checks.md의 "브라우저 시험"을 따른다.
   browser:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -74,7 +74,7 @@ jobs:
   # 시험 버전은 선언한 범위(engines.node >=24.18) 안의 최저 24.18, 24 계열 24, 현재 최신 메이저 26이다.
   # setup-node는 부분 버전을 semver 범위로 푼다(24.18은 24.18.x).
   # check-latest를 켜지 않아 runner 이미지에 캐시된 버전을 먼저 쓴다. 24는 캐시된 24.x라 공개 최신 패치보다 늦을 수 있다.
-  # 범위와 이유는 docs/agents/testing.md의 "소비 검사"를 따른다.
+  # 범위와 이유는 docs/agents/extra-checks.md의 "소비 검사"를 따른다.
   consume:
     name: consume (node ${{ matrix.node }})
     runs-on: ubuntu-latest
