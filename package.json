@@ -1,0 +1,30 @@
+{
+  "name": "projectfile-workspace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "check-types": "turbo run check-types",
+    "check:escompat": "turbo run check:escompat",
+    "check:license": "pnpm --filter @cp949/projectfile check:license",
+    "check:consume": "pnpm --filter @cp949/projectfile check:consume",
+    "check:package": "pnpm --filter @cp949/projectfile check:package",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "vectors:generate": "pnpm --filter @cp949/projectfile vectors:generate",
+    "verify": "pnpm lint && pnpm format:check && pnpm check-types && pnpm test && pnpm build && pnpm check:escompat && pnpm check:license",
+    "clean": "turbo run clean",
+    "changeset": "changeset",
+    "version": "changeset version"
+  },
+  "devDependencies": {
+    "@changesets/cli": "3.0.3",
+    "oxfmt": "0.75.0",
+    "oxlint": "1.90.0",
+    "turbo": "2.11.10"
+  },
+  "packageManager": "pnpm@12.15.0"
+}

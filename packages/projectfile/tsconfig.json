@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false
+  },
+  "include": [
+    "src",
+    "tests",
+    "tests-browser",
+    "vitest.config.mts",
+    "vitest.browser.config.mts",
+    "tsdown.config.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
+}

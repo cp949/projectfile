@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2019", "DOM"],
+    "noEmit": false,
+    "declaration": true,
+    "declarationMap": false,
+    "isolatedDeclarations": true
+  },
+  "include": ["src"]
+}

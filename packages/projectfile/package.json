@@ -1,0 +1,68 @@
+{
+  "name": "@cp949/projectfile",
+  "version": "0.1.0",
+  "description": "프로젝트 파일(소스 코드와 asset을 담은 파일 하나)의 인코더와 디코더",
+  "license": "MIT",
+  "author": "cp949",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cp949/projectfile.git",
+    "directory": "packages/projectfile"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "check-types": "tsc --noEmit && tsc --noEmit -p tsconfig.build.json && node scripts/check-readme.mjs",
+    "vectors:generate": "pnpm build && node scripts/generate-vectors.mjs",
+    "check:escompat": "es-check es2019 --module dist/index.js node_modules/fflate/esm/browser.js && node scripts/check-banned-api.mjs",
+    "check:license": "node scripts/check-license.mjs",
+    "check:consume": "node scripts/check-consume.mjs",
+    "check:package": "node scripts/check-package.mjs",
+    "measure:ceiling": "node scripts/measure-ceiling/index.mjs",
+    "measure:sections": "node scripts/measure-ceiling/sections-run.mjs",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:browser": "vitest run -c vitest.browser.config.mts",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "pnpm run build",
+    "publish:npm": "bash scripts/publish-npm.sh"
+  },
+  "dependencies": {
+    "fflate": "0.8.3"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@types/node": "26.6.5",
+    "@vitest/browser-playwright": "5.0.5",
+    "@vitest/coverage-v8": "5.0.5",
+    "es-check": "9.8.1",
+    "fast-check": "4.10.2",
+    "playwright": "1.64.0",
+    "playwright-core": "1.64.0",
+    "publint": "0.3.25",
+    "tsdown": "0.23.3",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  },
+  "engines": {
+    "node": ">=24.18"
+  }
+}
