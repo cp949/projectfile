@@ -12,7 +12,7 @@
 - 브라우저와 Node에서 돈다. `Blob`, `Response`, `TextEncoder`, `TextDecoder` 전역이 필요하다.
 - 의존은 `fflate` 하나다.
 
-사양의 원천은 저장소 루트의 `docs/format.md`다. 포맷, 검사 순서, 한도 규칙이 거기에 있다.
+사양의 원천은 저장소 루트의 [`docs/format.md`](https://github.com/cp949/projectfile/blob/main/docs/format.md)다. 포맷, 검사 순서, 한도 규칙이 거기에 있다.
 
 ## 설치
 
@@ -27,10 +27,10 @@ pnpm add @cp949/projectfile
 - 24.18보다 낮은 Node는 CI에서 시험하지 않는다.
 - 브라우저 하한은 Chrome 75다. 빌드 target은 `chrome75`다.
 - 전역 polyfill을 넣지 않는다. 하한에 없는 API는 쓰지 않는다.
-- `Blob.prototype.arrayBuffer()`는 Chrome 76부터라서 `Response`로 읽는다(`src/blob.ts`).
+- `Blob.prototype.arrayBuffer()`는 Chrome 76부터라서 `Response`로 읽는다([`src/blob.ts`](https://github.com/cp949/projectfile/blob/main/packages/projectfile/src/blob.ts)).
 - `check-types`는 `tsconfig.build.json`의 `lib`(ES2019 + DOM)로 ES2020 이후 API 사용을 잡는다.
 - `check:escompat`은 `dist/index.js`와 `fflate`의 ESM 산출물이 ES2019 문법인지 parse로 검사한다.
-- `check:escompat`은 `scripts/check-banned-api.mjs`로 `src`에서 하한에 없는 API 이름도 찾는다. 주석은 뺀다. 대상은 `Blob`의 `arrayBuffer`·`text`·`stream`, `Object.hasOwn`, `.at(`, `structuredClone`, `replaceAll` 같은 이름이다. 목록은 스크립트의 `RULES`다.
+- `check:escompat`은 [`scripts/check-banned-api.mjs`](https://github.com/cp949/projectfile/blob/main/packages/projectfile/scripts/check-banned-api.mjs)로 `src`에서 하한에 없는 API 이름도 찾는다. 주석은 뺀다. 대상은 `Blob`의 `arrayBuffer`·`text`·`stream`, `Object.hasOwn`, `.at(`, `structuredClone`, `replaceAll` 같은 이름이다. 목록은 스크립트의 `RULES`다.
 - 한계: 이름 검색이라 동적 접근(`obj[name]()`)과 목록에 없는 API는 못 잡는다. 목록에 없는 새 API는 리뷰에서 확인한다.
 - 한계: Chrome 75를 실제로 실행하지 않는다. Playwright가 Chrome 82 미만을 구동하지 못한다. 하한은 정적 검사로만 확인한다.
 
@@ -123,7 +123,7 @@ if (result.ok) {
 ```
 
 - 입력은 `Blob` 또는 `Uint8Array`다. 입력 `Uint8Array`는 바꾸지 않는다.
-- `Blob` 입력은 필요한 범위만 읽는다. asset 본문은 읽지 않는다. 범위는 `docs/format.md`의 "읽기 방식"에 있다.
+- `Blob` 입력은 필요한 범위만 읽는다. asset 본문은 읽지 않는다. 범위는 [`docs/format.md`](https://github.com/cp949/projectfile/blob/main/docs/format.md)의 "읽기 방식"에 있다.
 - 인코딩의 asset `data`는 `Blob` 또는 `Uint8Array`다. text `data`는 `string`이다.
 - text `data`의 짝 없는 서로게이트(U+D800..U+DFFF 코드 유닛)는 UTF-8 인코딩에서 U+FFFD로 바뀌어 저장된다.
   - 오류로 알리지 않는다. 디코딩 결과는 입력과 같지 않다.
@@ -161,7 +161,7 @@ if (result.ok) {
   - `Blob` 입력이면 입력을 `slice`한 `Blob`이다.
   - `Uint8Array` 입력이면 그 범위를 복사해 `new Blob`으로 만든 것이다.
 - 큰 파일은 `File`이나 `Blob`을 그대로 넘긴다. `Uint8Array` 입력은 asset마다 범위를 복사한다.
-- Chrome은 메모리에 있는 `Blob` 총량에 한계가 있다. 이 저장소 측정에서는 약 500 MiB였다(ADR-0001).
+- Chrome은 메모리에 있는 `Blob` 총량에 한계가 있다. 이 저장소 측정에서는 약 500 MiB였다([ADR-0001](https://github.com/cp949/projectfile/blob/main/docs/adr/0001-uncompressed-bytes-ceiling.md)).
   - 한계를 넘은 뒤에 만든 `Blob`은 읽을 때 실패한다.
   - 다 쓴 입력 asset `Blob`과 asset `Blob`의 참조는 놓는다.
 - `Blob` 입력의 원본이 바뀌거나 사라진 뒤에 asset `Blob`을 읽으면 읽기가 실패할 수 있다. 입력 `Blob`과 asset `Blob`의 수명은 호출자 책임이다.
@@ -223,7 +223,7 @@ const rules: ProjectFileRules = {
 입력 크기 상한:
 
 - `maxProjectFileBytes(limits)`는 한도 안의 항목을 인코딩한 파일이 넘지 않는 크기(바이트)다. 한도가 잘못되면 인코딩·디코딩과 같이 던진다.
-- 헤더는 최대 길이(`MAX_HEADER_BYTES`, 86바이트)로 잡는다. 계산식은 `docs/format.md`의 "입력 크기 상한"에 있다.
+- 헤더는 최대 길이(`MAX_HEADER_BYTES`, 86바이트)로 잡는다. 계산식은 [`docs/format.md`](https://github.com/cp949/projectfile/blob/main/docs/format.md)의 "입력 크기 상한"에 있다.
 - 호출자가 입력 크기를 직접 검사할 때 쓴다. 예: 업로드 크기 제한, 암호문 크기 검사("기밀성").
 
 ## kind
@@ -291,7 +291,7 @@ if (result.ok) {
 
 - 키가 필요 없다. `Blob` 입력은 앞 86바이트(`MAX_HEADER_BYTES`)까지만 읽는다.
 - 입력 크기 상한은 보지 않는다. 크기 제한이 필요하면 호출자가 `maxProjectFileBytes(limits)`로 직접 검사한다.
-- 통과해도 파일이 열린다는 뜻이 아니다. 검사 범위와 실패 이유는 `docs/format.md`의 "readProjectFileHeader"에 있다.
+- 통과해도 파일이 열린다는 뜻이 아니다. 검사 범위와 실패 이유는 [`docs/format.md`](https://github.com/cp949/projectfile/blob/main/docs/format.md)의 "readProjectFileHeader"에 있다.
 
 돌려주는 필드:
 
@@ -311,7 +311,7 @@ if (result.ok) {
 
 ## 포맷 버전
 
-포맷 버전은 1 하나다. 헤더와 manifest가 적는다. 바이트 배치와 검사 순서는 `docs/format.md`에 있다.
+포맷 버전은 1 하나다. 헤더와 manifest가 적는다. 바이트 배치와 검사 순서는 [`docs/format.md`](https://github.com/cp949/projectfile/blob/main/docs/format.md)에 있다.
 
 - 헤더는 magic `OCOD`, 포맷 버전, kind, payload 길이, CRC32, 키 확인값이다. scramble하지 않는다.
 - 모르는 헤더 버전은 `unsupported-version`으로 거부한다.
@@ -408,7 +408,7 @@ async function open(sealed: Blob, aesKey: CryptoKey) {
 
 ## test-vectors
 
-저장소 루트 `test-vectors/`는 다른 언어 구현이 같은 결과를 내는지 확인하는 시험 파일과 기대 결과다. npm 패키지에는 들어가지 않는다. 용도는 `docs/format.md`의 "test-vectors", 파일 형식은 `test-vectors/README.md`에 있다.
+저장소 루트 [`test-vectors/`](https://github.com/cp949/projectfile/tree/main/test-vectors)는 다른 언어 구현이 같은 결과를 내는지 확인하는 시험 파일과 기대 결과다. npm 패키지에는 들어가지 않는다. 용도는 [`docs/format.md`](https://github.com/cp949/projectfile/blob/main/docs/format.md)의 "test-vectors", 파일 형식은 [`test-vectors/README.md`](https://github.com/cp949/projectfile/blob/main/test-vectors/README.md)에 있다.
 
 ## 개발
 
@@ -422,21 +422,21 @@ pnpm --filter @cp949/projectfile check:escompat
 
 - `exports`는 `dist`를 가리킨다. 소비하기 전에 `build`가 필요하다.
 - `check:escompat`은 `dist`를 검사한다. `build` 뒤에 실행한다.
-- `test:browser`는 Chromium에서 `Blob` 경로 시험 일부를 실행한다. Chromium 설치와 범위는 저장소 루트 `README.md`와 `docs/agents/extra-checks.md`에 있다.
+- `test:browser`는 Chromium에서 `Blob` 경로 시험 일부를 실행한다. Chromium 설치와 범위는 저장소 루트 [`README.md`](https://github.com/cp949/projectfile/blob/main/README.md)와 [`docs/agents/extra-checks.md`](https://github.com/cp949/projectfile/blob/main/docs/agents/extra-checks.md)에 있다.
 - `dist`는 Git에 넣지 않는다.
-- 배포는 `pnpm --filter @cp949/projectfile publish:npm`다. 절차는 `docs/release.md`에 있다.
+- 배포는 `pnpm --filter @cp949/projectfile publish:npm`다. 절차는 [`docs/release.md`](https://github.com/cp949/projectfile/blob/main/docs/release.md)에 있다.
 
 ## Worker에서 호출
 
 큰 프로젝트는 Worker에서 호출한다. 메인 스레드를 비우려는 용도다.
 
-- `encodeProjectFile`의 압축(deflate)은 `fflate`의 동기 함수 `deflateSync`다(`src/zip-write.ts`).
-- `decodeProjectFile`의 해제(inflate)는 `fflate`의 동기 클래스 `Inflate`다(`src/zip.ts`).
-- scramble 계산도 동기 처리다. 근거는 `docs/format.md`의 "scramble"이다.
+- `encodeProjectFile`의 압축(deflate)은 `fflate`의 동기 함수 `deflateSync`다([`src/zip-write.ts`](https://github.com/cp949/projectfile/blob/main/packages/projectfile/src/zip-write.ts)).
+- `decodeProjectFile`의 해제(inflate)는 `fflate`의 동기 클래스 `Inflate`다([`src/zip.ts`](https://github.com/cp949/projectfile/blob/main/packages/projectfile/src/zip.ts)).
+- scramble 계산도 동기 처리다. 근거는 [`docs/format.md`](https://github.com/cp949/projectfile/blob/main/docs/format.md)의 "scramble"이다.
 - 메인 스레드에서 호출하면 동기 계산이 도는 동안 그 스레드의 다른 작업이 멈춘다.
 - Worker는 호출한 스레드를 비워 줄 뿐이다. 걸리는 전체 시간은 줄이지 않는다.
 
-호출 하나가 끝날 때까지 걸린 시간이다. Chrome에서 쟀다(ADR-0001):
+호출 하나가 끝날 때까지 걸린 시간이다. Chrome에서 쟀다([ADR-0001](https://github.com/cp949/projectfile/blob/main/docs/adr/0001-uncompressed-bytes-ceiling.md)):
 
 | 입력(풀린 크기 256 MiB)                                          | 인코딩 | 디코딩 |
 | ---------------------------------------------------------------- | ------ | ------ |
@@ -446,7 +446,7 @@ pnpm --filter @cp949/projectfile check:escompat
 - 동기 계산만의 시간은 재지 않았다. 위 시간에는 `Blob` 읽기도 들어 있다.
 - 텍스트 위주 입력은 낱말 19개를 섞은 텍스트라 압축이 잘 된다. 다른 압축률은 재지 않았다.
 - asset 위주 입력이 짧은 이유는 asset 본문을 압축하지 않고 디코딩이 읽지도 않기 때문이라고 본다. 구간별로 나눠 재지 않은 추정이다.
-- PC 한 대에서 잰 값이다. Linux(WSL2), Intel Core i9-14900KF, RAM 32 GiB, 헤드리스 Chrome이다. 정확한 환경은 `docs/adr/0001-uncompressed-bytes-ceiling.md`에 있다.
+- PC 한 대에서 잰 값이다. Linux(WSL2), Intel Core i9-14900KF, RAM 32 GiB, 헤드리스 Chrome이다. 정확한 환경은 [`docs/adr/0001-uncompressed-bytes-ceiling.md`](https://github.com/cp949/projectfile/blob/main/docs/adr/0001-uncompressed-bytes-ceiling.md)에 있다.
 
 Worker에서 인코딩해 `Blob`을 메인에 돌려주는 예:
 
