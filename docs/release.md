@@ -27,12 +27,6 @@ pnpm changeset
 | `minor` | 새 기능                        |
 | `major` | 기존 사용 코드와 어긋나는 변경 |
 
-첫 배포 전:
-
-- changeset을 만들지 않는다. 변경은 `CHANGELOG.md`의 첫 항목에 직접 적는다.
-  - 이유: 대기 changeset이 있으면 "절차" 1단계가 `package.json` 버전을 올린다. 첫 배포 버전이 `CHANGELOG.md`의 첫 항목과 달라진다.
-- "절차" 1단계를 건너뛴다. `package.json` 버전과 `CHANGELOG.md`가 이미 첫 배포 내용이다.
-
 ## 절차
 
 1. 버전과 변경 로그를 만든다.
