@@ -51,8 +51,9 @@ pnpm changeset
    - 배포 전에 확인하려면 로컬에서 `pnpm --filter @cp949/projectfile test:browser`를 실행한다. Chromium 설치가 필요하다. 설치 명령은 `docs/agents/extra-checks.md`의 "브라우저 시험"을 따른다.
 4. 버전 태그를 만든다. `package.json`의 버전과 맞춘다.
    ```sh
-   git tag v<버전>
+   git tag -a v<버전> -m "v<버전>"
    ```
+   - annotated 태그로 만든다. 6단계의 `--follow-tags`는 lightweight 태그를 올리지 않는다.
 5. 배포한다. 스크립트가 `v<버전>` 태그가 HEAD를 가리키는지 먼저 확인한다. 없으면 멈춘다.
    ```sh
    pnpm --filter @cp949/projectfile run publish:npm
