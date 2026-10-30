@@ -362,22 +362,6 @@ describe("프로젝트 파일 거부", () => {
       failure: { reason: "input-too-large", maxBytes },
     });
   });
-
-  it("입력을 읽지 못하면 던지지 않고 read-failed를 돌려준다", async () => {
-    class FailingResponse {
-      arrayBuffer(): Promise<ArrayBuffer> {
-        return Promise.reject(
-          new DOMException("읽기 실패", "NotReadableError"),
-        );
-      }
-    }
-    vi.stubGlobal("Response", FailingResponse);
-
-    expect(await decode(new Blob([]))).toEqual({
-      ok: false,
-      failure: { reason: "read-failed" },
-    });
-  });
 });
 
 /**

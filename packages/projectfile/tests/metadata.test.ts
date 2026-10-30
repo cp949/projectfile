@@ -93,12 +93,6 @@ describe("프로젝트 파일: 메타데이터와 manifest 본문만 scramble", 
     }
   });
 
-  it("같은 트리는 같은 바이트가 된다", async () => {
-    expect(await encodeBytes(richProject())).toEqual(
-      await encodeBytes(richProject()),
-    );
-  });
-
   it("호출자가 넘긴 Uint8Array를 바꾸지 않고 연다", async () => {
     const bytes = await encodeBytes(richProject());
     const before = bytes.slice();

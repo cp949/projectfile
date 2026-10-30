@@ -324,6 +324,7 @@ describe("프로젝트 파일 manifest 상한", () => {
   };
 
   it("manifest가 1 MiB를 넘는 프로젝트를 인코딩이 거부한다", async () => {
+    // 상한을 문자 수가 아니라 UTF-8 바이트로 세는지 본다. 아래 경계값 시험은 ASCII 경로만 쓴다.
     // 경로가 1,000자인 비 ASCII 빈 텍스트 400개. manifest는 UTF-8로 약 1.2 MiB다.
     const entries = Array.from({ length: 400 }, (_, i): ProjectEntry => {
       return { path: "가".repeat(1000) + i, type: "text", data: "" };

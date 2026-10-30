@@ -119,24 +119,11 @@ describe("readProjectFileHeader", () => {
       new DataView(copy.buffer).setUint32(at, value, true);
       return copy;
     };
+    // 헤더 단계의 거부 이유별 사례는 `vectors.test.ts`가 두 함수와 두 입력으로 확인한다.
+    // 여기에는 시험 벡터에 없는 경계 입력만 둔다.
     // `good`는 beforeAll 뒤에 생기므로 입력은 시험 안에서 만든다.
     const cases: [string, () => Uint8Array<ArrayBuffer>, string][] = [
-      ["magic이 틀림", () => patched([0, 0x58]), "bad-magic"],
-      ["4바이트가 안 됨", () => good.slice(0, 3), "bad-magic"],
       ["빈 입력", () => new Uint8Array(0), "bad-magic"],
-      ["22바이트 미만", () => good.slice(0, 21), "length-mismatch"],
-      ["모르는 버전", () => patched([4, 9]), "unsupported-version"],
-      ["kind 길이 0", () => patched([5, 0]), "kind-invalid"],
-      ["kind 길이 65", () => patched([5, 65]), "kind-invalid"],
-      ["22 + N 미만", () => good.slice(0, 25), "length-mismatch"],
-      ["kind 대문자", () => patched([22, 0x45]), "kind-invalid"],
-      [
-        "kind 끝 줄바꿈",
-        () => patched([22 + KIND.length - 1, 0x0a]),
-        "kind-invalid",
-      ],
-      ["잘림", () => good.slice(0, good.length - 1), "length-mismatch"],
-      ["덧붙음", () => Uint8Array.from([...good, 0]), "length-mismatch"],
       [
         "payload 길이 필드가 큼",
         () => withUint32(6, 2 ** 32 - 1),

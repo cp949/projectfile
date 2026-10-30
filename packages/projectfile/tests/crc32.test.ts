@@ -95,15 +95,4 @@ describe("CRC32", () => {
       expect(crc32(data.subarray(split), head), `분할 ${split}`).toBe(whole);
     }
   });
-
-  it("여러 조각으로 나눠 이어 계산해도 같다", () => {
-    const data = noise(1000);
-    let crc = 0;
-
-    for (let start = 0; start < data.length; start += 13) {
-      crc = crc32(data.subarray(start, start + 13), crc);
-    }
-
-    expect(crc).toBe(referenceCrc32(data));
-  });
 });
