@@ -1,6 +1,6 @@
 {
   "name": "@cp949/projectfile",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "프로젝트 파일(소스 코드와 asset을 담은 파일 하나)의 인코더와 디코더",
   "keywords": [
     "blob",
