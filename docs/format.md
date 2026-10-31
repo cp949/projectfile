@@ -26,6 +26,7 @@
 - `limits`(`ProjectFileLimits`): 모든 항목을 호출자가 넘긴다. 기본값이 없다. 항목은 0 이상의 정수여야 한다.
 - `kind`: 파일의 종류. 사용처가 정한다("kind").
 - scramble 키: 비우면 기본 키를 쓴다("scramble 키").
+- scramble 범위(`scrambleScope`): 인코딩 옵션. 비우면 `"metadata"`다("scramble").
 
 오류는 두 갈래다.
 
@@ -35,6 +36,7 @@
 - 호출자 버그는 던진다.
   - 규칙을 어긴 `kind`.
   - 길이가 16이 아닌 scramble 키.
+  - `"metadata"`나 `"all"`이 아닌 `scrambleScope`.
   - 빈 `scrambleKeys`, 키 확인값이 같은 키가 둘 이상인 `scrambleKeys`.
   - 잘못된 `maxPathLength`와 한도 항목. NaN이나 음수는 검사를 조용히 없애기 때문이다.
   - 절대 상한(`MAX_UNCOMPRESSED_BYTES_CEILING`)을 넘는 `maxUncompressedBytes`("한도").
@@ -44,26 +46,31 @@
 
 헤더는 scramble하지 않는다. 길이는 22 + N바이트다. N은 kind 문자열의 길이다.
 
-| 위치     | 내용                                                       |
-| -------- | ---------------------------------------------------------- |
-| 0..3     | magic `OCOD` (`0x4f 0x43 0x4f 0x44`)                       |
-| 4        | 포맷 버전. 1                                               |
-| 5        | kind 길이 N. 1 이상 64 이하                                |
-| 6..9     | payload 길이. LE uint32. payload는 ZIP 전체다.             |
-| 10..13   | CRC32. LE uint32. 범위는 "scramble"                        |
-| 14..17   | `centralStart`. ZIP 안 중앙 디렉터리 시작 위치. LE uint32  |
-| 18..21   | 키 확인값. 키 16바이트의 CRC32. LE uint32                  |
-| 22..21+N | kind 문자열. ASCII                                         |
-| 22+N..   | payload = 메타데이터 범위와 manifest 본문만 scramble한 ZIP |
+| 위치     | 내용                                                      |
+| -------- | --------------------------------------------------------- |
+| 0..3     | magic `OCOD` (`0x4f 0x43 0x4f 0x44`)                      |
+| 4        | 포맷 버전. 1 또는 2                                       |
+| 5        | kind 길이 N. 1 이상 64 이하                               |
+| 6..9     | payload 길이. LE uint32. payload는 ZIP 전체다.            |
+| 10..13   | CRC32. LE uint32. 범위는 "scramble"                       |
+| 14..17   | `centralStart`. ZIP 안 중앙 디렉터리 시작 위치. LE uint32 |
+| 18..21   | 키 확인값. 키 16바이트의 CRC32. LE uint32                 |
+| 22..21+N | kind 문자열. ASCII                                        |
+| 22+N..   | payload = scramble한 ZIP. 버전 1은 일부, 버전 2는 전체    |
 
 - 헤더 길이의 최대는 86바이트다(`MAX_HEADER_BYTES`, `src/header.ts`).
 - 파일 크기는 22 + N + payload 길이와 같아야 한다.
 - 키가 없는 쪽도 헤더만으로 magic, 버전, kind, 길이, 키 확인값을 읽을 수 있다.
 - CRC는 scramble 전 평문 기준이라 키 없이 계산할 수 없다. 클라이언트가 열 때 검사한다.
-- 포맷 버전은 1 하나다. 모르는 버전은 열지 않고 `unsupported-version`으로 거부한다.
+- 포맷 버전은 scramble하는 범위를 정한다. 이 값이 파일에 남는 유일한 표시이므로 디코딩은 버전을 보고 범위를 안다.
+  - 버전 1: ZIP 메타데이터 범위와 `manifest.json` 본문만 섞는다.
+  - 버전 2: ZIP 전체를 섞는다. 헤더 CRC도 ZIP 전체를 본다.
+- 1과 2가 아닌 버전은 열지 않고 `unsupported-version`으로 거부한다.
+- 두 버전의 헤더 배치는 같다. 서버가 헤더만 읽는 구현은 버전 값 2를 받아야 한다.
 - ZIP 메타데이터가 섞여 일반 압축 도구가 파일 목록을 읽지 못한다.
 - 로컬 헤더, 중앙 디렉터리, `manifest.json` 본문이 섞인다. 시그니처와 모든 파일 경로가 평문으로 보이지 않는다.
-- 섞지 않는 텍스트와 asset 본문에는 평문이 남는 경우가 있다("ZIP과 manifest").
+- 버전 1은 섞지 않는 텍스트와 asset 본문에 평문이 남는 경우가 있다("ZIP과 manifest"). 버전 2는 남지 않는다.
+- 두 버전의 선택 이유와 대안은 `docs/adr/0007-full-scramble-version.md`에 있다.
 
 ### kind
 
@@ -90,7 +97,7 @@ manifest 필드:
 
 | 필드            | 내용                                                           |
 | --------------- | -------------------------------------------------------------- |
-| `formatVersion` | 헤더 버전(1)과 같아야 한다.                                    |
+| `formatVersion` | 헤더 버전과 같아야 한다.                                       |
 | `kind`          | kind 규칙을 지키는 문자열. 헤더 kind와 같아야 한다.            |
 | `files`         | 파일마다 `path`(`files/`를 뗀 경로)와 `type`(`text`, `asset`). |
 
@@ -112,7 +119,7 @@ manifest 필드:
 - asset을 압축하지 않으므로 ZIP 안의 asset 본문 범위가 원본 바이트다. 디코딩이 이 범위를 `Blob`으로 돌려준다.
 - ZIP 필드와 항목 순서를 고정한다. 같은 입력은 같은 바이트가 된다.
 
-섞지 않는 본문에 평문이 남는 경우:
+섞지 않는 본문에 평문이 남는 경우(버전 1만. 버전 2는 모든 본문을 섞는다):
 
 - deflate는 블록마다 stored, 고정 Huffman, 동적 Huffman 중 짧은 것을 고른다.
 - stored 블록은 입력 바이트를 그대로 담는다.
@@ -169,16 +176,19 @@ manifest 필드:
 - 바이트마다 `치환표[바이트 ^ 키스트림(위치)]`다. 출력은 입력 바이트와 위치만 따른다.
 - 입력을 나눠 처리해도 한 번에 처리한 결과와 같다. 나눈 조각의 시작 위치를 `offset`으로 넘긴다. 범위마다 섞는 데 쓰는 성질이다.
 - 블록 순서 섞기는 쓰지 않는다. 전체 버퍼링이 필요해 스트리밍과 충돌한다.
-- 동기 처리다. Web Worker와 청크 스트리밍은 쓰지 않는다.
+- 동기 처리다. Web Worker와 `ReadableStream` 같은 스트리밍은 쓰지 않는다.
+- 버전 2는 `Blob`을 1 MiB(`CHUNK_BYTES`)씩 읽는다. 조각마다 계산은 동기다.
 
 섞는 범위와 CRC 범위:
 
-| 항목      | 내용                                                                                                      |
-| --------- | --------------------------------------------------------------------------------------------------------- |
-| 섞는 범위 | 항목마다 로컬 헤더, `manifest.json` 항목의 본문, `centralStart`부터 ZIP 끝까지(중앙 디렉터리 + 끝 레코드) |
-| 본문      | manifest만 섞는다. 나머지 텍스트(deflate)와 asset(원본)은 섞지 않는다                                     |
-| CRC 범위  | scramble 전 평문의 섞는 범위. ZIP 위치 순서로 이어서 계산한다                                             |
-| 본문 손상 | manifest는 헤더 CRC가 잡는다. 텍스트는 ZIP 항목 CRC32가 잡는다. asset은 열 때 검사하지 않는다             |
+| 항목      | 버전 1                                                                                                    | 버전 2                                                            |
+| --------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| 섞는 범위 | 항목마다 로컬 헤더, `manifest.json` 항목의 본문, `centralStart`부터 ZIP 끝까지(중앙 디렉터리 + 끝 레코드) | ZIP 전체                                                          |
+| 본문      | manifest만 섞는다. 나머지 텍스트(deflate)와 asset(원본)은 섞지 않는다                                     | 모든 본문을 섞는다                                                |
+| CRC 범위  | scramble 전 평문의 섞는 범위. ZIP 위치 순서로 이어서 계산한다                                             | scramble 전 평문의 ZIP 전체. ZIP 위치 순서로 이어서 계산한다      |
+| 본문 손상 | manifest는 헤더 CRC가 잡는다. 텍스트는 ZIP 항목 CRC32가 잡는다. asset은 열 때 검사하지 않는다             | 모든 본문을 헤더 CRC가 잡는다. 텍스트는 ZIP 항목 CRC32도 비교한다 |
+
+버전 1의 범위 규칙:
 
 - 로컬 헤더 범위는 30바이트 + 이름 길이다.
 - 로컬 헤더의 extra 길이는 0이다. 디코딩은 0이 아니면 `zip-corrupt`로 거부한다. 인코딩은 extra를 쓰지 않는다("ZIP 쓰기").
@@ -191,6 +201,17 @@ manifest 필드:
 - manifest를 뺀 본문은 섞지 않았으므로 복원하지 않는다. asset 본문은 읽지도 않는다("읽기 방식").
 - 헤더 CRC는 로컬 헤더와 중앙 디렉터리가 적은 항목 CRC32를 통해 저장 시점의 본문을 간접으로 반영한다. 저장한 뒤 본문이 고쳐진 것은 헤더 CRC가 잡지 못한다.
 - 로컬 헤더의 이름 길이는 중앙 디렉터리와 같아야 한다. 이 코덱이 만든 ZIP이라서 다르면 거부한다.
+
+버전 2의 범위 규칙:
+
+- 위치 0부터 ZIP 끝까지 모든 바이트를 `scramble(조각, 시작 위치)`로 섞는다. 위치는 ZIP 안 위치다.
+- CRC는 섞기 전 ZIP을 처음부터 끝까지 이어서 계산한다.
+- 봉인은 모든 조각을 새 버퍼로 섞는다(`src/full-scramble.ts`). 입력을 고치지 않는다.
+  - asset `Blob`은 `CHUNK_BYTES`씩 읽어 섞고, 섞은 조각을 곧바로 `Blob` 조각으로 만든다.
+  - 인코딩은 asset을 두 번 읽는다. 항목 CRC32를 계산할 때 한 번, 섞을 때 한 번이다.
+- 열기는 읽은 범위를 읽는 즉시 ZIP 위치를 기준으로 평문으로 되돌리는 읽기 수단을 쓴다(`createUnscrambledReader`). 이후 단계는 두 버전이 같은 코드를 지난다.
+- 로컬 헤더의 extra 길이는 0이고, 로컬 헤더의 이름 길이는 중앙 디렉터리와 같아야 한다. 버전 1과 같다.
+- asset 본문도 섞여 있으므로 입력의 `slice`가 원본 바이트가 아니다. 디코딩은 본문을 `CHUNK_BYTES`씩 읽어 평문으로 되돌린 새 `Blob`을 만든다.
 
 ### scramble 키
 
@@ -268,14 +289,14 @@ x = mul32(x ^ w2, 0x27D4EB2F)
 
 1. 입력 크기와 읽기. "입력 크기 상한"을 넘으면 읽지 않고 `input-too-large`(`maxBytes`에 상한). 풀린 크기 합계 초과는 10단계의 `limit-exceeded`(`maxUncompressedBytes`)다. 헤더 범위를 읽지 못하면 `read-failed`. 이후 단계의 읽기가 실패해도 `read-failed`다("읽기 방식").
 2. magic. 4바이트가 안 되거나 `OCOD`가 아니면 `bad-magic`.
-3. 헤더 길이와 포맷 버전. 22바이트 미만이면 `length-mismatch`. 모르는 버전은 `unsupported-version`.
+3. 헤더 길이와 포맷 버전. 22바이트 미만이면 `length-mismatch`. 1과 2가 아닌 버전은 `unsupported-version`.
 4. kind.
    - kind 길이 N이 0이거나 64를 넘으면 `kind-invalid`.
    - 22 + N바이트 미만이면 `length-mismatch`.
    - kind 문자열이 규칙을 어기면 `kind-invalid`. 규칙을 지켰지만 기대한 kind와 다르면 `kind-mismatch`.
 5. 전체 크기. 22 + N + payload 길이와 다르면 `length-mismatch`. 잘림과 덧붙음을 모두 잡는다.
 6. 키. 헤더의 키 확인값과 같은 키가 없으면 `scramble-key-mismatch`.
-7. 복원과 CRC32. 메타데이터와 manifest 본문을 되돌린다. 끝 레코드의 항목 수가 `maxFiles` + `maxFolders` + 2를 넘으면 로컬 헤더를 읽기 전에 `zip-corrupt`. 범위를 정할 수 없으면 `zip-corrupt`, 그 범위의 CRC가 헤더와 다르면 `crc-mismatch`.
+7. 복원과 CRC32. 메타데이터와 manifest 본문을 되돌린다. 끝 레코드의 항목 수가 `maxFiles` + `maxFolders` + 2를 넘으면 로컬 헤더를 읽기 전에 `zip-corrupt`. 범위를 정할 수 없으면 `zip-corrupt`, CRC가 헤더와 다르면 `crc-mismatch`. CRC 범위는 버전 1이 섞는 범위, 버전 2가 ZIP 전체다. 버전 2에서 ZIP 전체를 읽지 못하면 `read-failed`.
 8. ZIP 항목 목록. 암호화 항목, 읽지 못하는 이름, 겹치는 이름, 틀린 로컬 헤더 시그니처, `centralStart`를 넘는 압축 데이터는 `zip-corrupt`. 중앙 디렉터리의 구조 손상은 7단계가 먼저 거부한다. 내용은 풀지 않는다.
 9. manifest. 선언 크기가 1 MiB(`MANIFEST_MAX_BYTES`)를 넘거나 형식이 틀리면 `manifest-invalid`. `manifest.json` 항목이 없으면 7단계에서 `zip-corrupt`다. 풀리지 않으면 `zip-corrupt`. 헤더와 kind가 다르면 `manifest-kind-mismatch`.
 10. 항목 대응, 이름, 한도.
@@ -301,7 +322,11 @@ x = mul32(x ^ w2, 0x27D4EB2F)
   - 로컬 헤더나 manifest 본문이 겹치거나 `centralStart`를 넘는다. manifest 본문이 ZIP 밖까지 가는 경우를 포함한다.
   - 로컬 헤더의 이름 길이가 중앙 디렉터리와 다르다.
   - 로컬 헤더의 extra 길이가 0이 아니다.
-- 범위를 정할 수 있는 손상은 CRC가 `crc-mismatch`로 잡는다. 범위 안 어느 한 바이트를 고쳐도 `crc-mismatch`나 `zip-corrupt`다.
+- 범위를 정할 수 있는 손상은 CRC가 `crc-mismatch`로 잡는다. 범위 안 어느 한 바이트를 고쳐도 `crc-mismatch`나 `zip-corrupt`다. 버전 2의 범위는 ZIP 전체다.
+- 버전 2는 위 구조 검사를 마친 뒤 ZIP 전체를 `CHUNK_BYTES`씩 순서대로 읽어 평문 CRC를 이어서 계산한다.
+  - 구조 손상은 CRC가 틀려도 `zip-corrupt`다. 버전 1과 같은 순서다.
+  - 입력 크기 상한이 읽는 양을 묶는다.
+  - 이 읽기를 11단계의 읽기와 합치지 않는다. 파일 내용이 텍스트인지 asset인지는 9단계에서 manifest를 풀어야 안다. CRC는 그보다 앞 단계다.
 - 복원은 읽은 조각마다 새 배열에 푼다. 입력을 고치지 않고 전체를 복사하지도 않는다. 호출자가 넘긴 `Uint8Array`도 같다.
 - 복원한 중앙 디렉터리는 이 단계에서 ZIP 읽기 코드(`readCentralRecords`)가 한 번 읽는다. 끝 레코드와 항목의 구조를 여기서 검사한다.
 - 8단계부터는 그 레코드와 복원한 로컬 헤더를 ZIP 읽기 코드(`readZipEntries`, `inflateEntry`)가 읽는다.
@@ -328,10 +353,11 @@ x = mul32(x ^ w2, 0x27D4EB2F)
 11단계의 asset 항목:
 
 - 저장(방식 0)이어야 하고 압축 크기가 선언 크기와 같아야 한다. 아니면 `zip-corrupt`다.
-- 이유: 디코딩 출력의 `Blob`이 입력의 본문 범위 그대로다. 범위가 곧 원본 바이트여야 한다.
-- 본문을 읽거나 풀지 않는다.
-- 디코딩은 asset의 CRC32를 확인하지 않는다. 인코딩은 이 값을 계산해 ZIP 항목에 적는다.
-- 열 때 asset 손상은 잡지 못한다.
+- 이유: 버전 1은 디코딩 출력의 `Blob`이 입력의 본문 범위 그대로다. 범위가 곧 원본 바이트여야 한다.
+- 버전 1은 본문을 읽거나 풀지 않는다.
+- 버전 2는 본문을 `CHUNK_BYTES`씩 읽어 평문으로 되돌린 새 `Blob`을 만든다. 읽지 못하면 `read-failed`다.
+- 디코딩은 asset의 항목 CRC32를 확인하지 않는다. 인코딩은 이 값을 계산해 ZIP 항목에 적는다.
+- 열 때 asset 손상은 버전 1이 잡지 못한다. 버전 2는 7단계의 헤더 CRC가 잡는다.
 
 공통:
 
@@ -350,6 +376,7 @@ x = mul32(x ^ w2, 0x27D4EB2F)
   - 읽지 못한 asset이 여럿이면 ZIP에 쓰는 순서("항목 순서")로 처음 읽지 못한 하나만 알린다.
   - 앞의 이름·한도·manifest 길이 검사에서 걸리면 asset을 읽지 않는다.
   - 호출자 버그로 던지는 오류는 이 이유로 바꾸지 않는다.
+- 버전 2의 인코딩은 입력 크기 상한 비교 뒤 asset을 섞으려고 한 번 더 읽는다. 이 읽기의 실패도 `read-failed`와 `path`로 돌려준다.
 - 경로가 길수록 manifest가 크다. 경로가 모두 1,024 코드 유닛의 비 ASCII이면 파일 약 340개에서 넘는다. `maxFiles`가 이보다 크면 한도 안의 입력도 `manifest-too-large`가 될 수 있다.
 - 10단계는 폴더를 먼저, 파일을 나중에 검사한다. 디코딩은 ZIP 폴더 항목 다음 manifest 파일 순서다. 인코딩은 `folders` 다음 `entries` 순서다.
 - 위반이 여럿이면 처음 걸린 하나만 돌려준다. 그래서 어느 경로를 알리는지는 이 순서를 따른다. 예: 폴더 `x` 안의 잘못된 파일과 형제 폴더 `y`의 잘못된 이름이 함께 있으면 `y`를 알린다.
@@ -436,16 +463,19 @@ x = mul32(x ^ w2, 0x27D4EB2F)
 
 ## 알려진 한계
 
-- 열 때 asset 본문 손상을 검사하지 않는다. 헤더 CRC가 메타데이터 범위와 manifest 본문만 본다. asset은 ZIP 항목 CRC32도 비교하지 않는다.
-- 섞지 않는 본문에 평문이 남는 경우가 있다. 비 ASCII 텍스트의 stored 블록과 asset 원본이다. manifest 본문은 섞으므로 파일 경로는 남지 않는다("ZIP과 manifest").
-- 텍스트와 manifest는 전부 메모리에 올린다. asset 본문은 올리지 않는다.
-  - 인코딩: 텍스트와 deflate 결과, 섞은 조각이 메모리에 있다. asset `Blob`은 CRC32를 계산하려고 1 MiB(`CRC_CHUNK_BYTES`)씩 읽는다.
+- 버전 1은 열 때 asset 본문 손상을 검사하지 않는다. 헤더 CRC가 메타데이터 범위와 manifest 본문만 본다. asset은 ZIP 항목 CRC32도 비교하지 않는다. 버전 2는 헤더 CRC가 ZIP 전체를 본다.
+- 버전 1은 섞지 않는 본문에 평문이 남는 경우가 있다. 비 ASCII 텍스트의 stored 블록과 asset 원본이다. manifest 본문은 섞으므로 파일 경로는 남지 않는다("ZIP과 manifest"). 버전 2는 남지 않는다.
+- 텍스트와 manifest는 전부 메모리에 올린다. asset 본문은 `Uint8Array`로 올리지 않는다.
+  - 인코딩: 텍스트와 deflate 결과, 섞은 조각이 메모리에 있다. asset `Blob`은 CRC32를 계산하려고 1 MiB(`CRC_CHUNK_BYTES`)씩 읽는다. 버전 2는 섞으려고 `CHUNK_BYTES`씩 한 번 더 읽는다.
   - 디코딩: `Blob` 입력은 필요한 범위만 읽는다("읽기 방식"). `Uint8Array` 입력은 asset마다 그 범위를 복사한 `Blob`을 만든다.
+  - 버전 2의 디코딩은 payload 전체를 읽고, asset마다 평문으로 되돌린 새 `Blob`을 만든다. 같은 입력을 버전 1로 인코딩한 파일보다 시간이 든다. 측정은 `docs/adr/0007-full-scramble-version.md`에 있다.
 - 항목 수 한도는 10단계에서 본다. 그 전에 중앙 디렉터리 항목마다 범위와 조각을 만든다. 손상 파일은 항목이 많을수록 한도 검사 전 메모리가 커진다.
   - 끝 레코드 항목 수가 `maxFiles` + `maxFolders` + 2를 넘으면 7단계가 로컬 헤더를 읽기 전에 거부한다. 그래서 이 메모리는 호출자 한도의 합에 묶이고, 합의 최대는 65,535다.
   - 측정은 항목 65,000개인 6.4 MB 파일이다. Node에서 heap 증가는 `Blob` 입력 약 162 MB, `Uint8Array` 입력 약 71 MB였다. 이 값은 합이 65,000 이상인 한도에서만 나온다. 합이 작은 한도의 메모리는 재지 않았다.
 
 ## 읽기 방식
+
+이 절은 포맷 버전 1의 읽기 방식이다. 버전 2는 "버전 2의 읽기"가 다르게 정한다.
 
 디코딩은 `Blob` 입력에서 필요한 범위만 읽는다. 입력 전체를 읽지 않는다.
 
@@ -481,6 +511,21 @@ x = mul32(x ^ w2, 0x27D4EB2F)
 - 읽지 않고 부분 뷰를 쓴다. 입력을 바꾸지 않고 전체를 복사하지 않는다.
 - asset은 그 범위를 복사한 `Blob`이다.
 
+### 버전 2의 읽기
+
+버전 2는 헤더 CRC가 ZIP 전체를 보고 asset 본문이 섞여 있어서 입력 전체를 읽는다.
+
+- 버전 1과 같은 범위(헤더, 중앙 디렉터리, 로컬 헤더, 압축 본문, 저장 텍스트 본문)를 읽는다. 읽자마자 ZIP 위치를 기준으로 평문으로 되돌린다.
+- 7단계에서 ZIP 전체를 `CHUNK_BYTES`씩 순서대로 읽어 CRC를 계산한다.
+- 11단계에서 asset 본문을 `CHUNK_BYTES`씩 순서대로 읽어 평문 `Blob`을 만든다.
+- 읽기 호출은 버전 1의 상한에 두 값을 더한 수 이하다.
+  - payload 길이를 `CHUNK_BYTES`로 나눈 올림.
+  - asset마다 선언 크기를 `CHUNK_BYTES`로 나눈 올림의 합.
+- 두 읽기는 순차라서 동시에 진행하는 읽기 수의 상한(16개)은 그대로다.
+- 어느 읽기가 실패해도 `read-failed`다. 읽은 바이트가 범위보다 짧아도 같다.
+- `Uint8Array` 입력은 읽지 않고 부분 뷰에서 새 배열로 되돌린다. 입력을 바꾸지 않는다.
+- 입력 전체를 읽으므로 시간은 입력 크기에 비례한다. 입력 크기는 `maxProjectFileBytes(limits)`가 묶는다.
+
 ## readProjectFileHeader
 
 키 없이 헤더만 읽고 검사하는 함수다. 서버가 업로드된 파일의 헤더만 검사하는 용도다. 서버는 키가 없고 내용을 열 필요가 없다.
@@ -493,7 +538,7 @@ x = mul32(x ^ w2, 0x27D4EB2F)
 - 키 확인값 일치(6단계), CRC(7단계), ZIP과 manifest(8단계 이후)는 보지 않는다. 통과해도 파일이 열린다는 뜻이 아니다.
 - 열 수 없는 입력은 던지지 않고 `ProjectFileFailure`를 돌려준다.
 
-돌려주는 값(`ProjectFileHeaderInfo`)은 헤더의 포맷 버전, kind, payload 길이, 헤더 길이(22 + N), 키 확인값이다. 필드 이름과 타입은 패키지 README에 있다.
+돌려주는 값(`ProjectFileHeaderInfo`)은 헤더의 포맷 버전(1이나 2), kind, payload 길이, 헤더 길이(22 + N), 키 확인값이다. 필드 이름과 타입은 패키지 README에 있다.
 
 ## test-vectors
 

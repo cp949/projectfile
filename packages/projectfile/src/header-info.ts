@@ -5,7 +5,6 @@
 // - 규칙은 `docs/format.md`의 "헤더"와 "검사 순서"에 있다.
 import { fail, type ProjectFileResult } from "./errors";
 import {
-  FORMAT_VERSION,
   MAX_HEADER_BYTES,
   readHeader,
   type ProjectFileHeader,
@@ -15,7 +14,7 @@ import { createRangeSource, type RangeSource } from "./read-range";
 
 /** `readProjectFileHeader`가 돌려주는 헤더 정보. */
 export interface ProjectFileHeaderInfo {
-  /** 포맷 버전. 지금은 1이다. */
+  /** 포맷 버전. 1(메타데이터 범위만 scramble)이나 2(ZIP 전체 scramble)다. */
   version: number;
 
   /** 헤더의 kind 문자열. 규칙은 `ProjectKind`다. */
@@ -66,11 +65,12 @@ export async function readProjectFileHeader(
   const inputBytes = input instanceof Uint8Array ? input.length : input.size;
   const result = await readHead(createRangeSource(input), inputBytes);
   if (!result.ok) return result;
-  const { kind, payloadLength, headerBytes, keyCheck } = result.value;
+  const { formatVersion, kind, payloadLength, headerBytes, keyCheck } =
+    result.value;
   return {
     ok: true,
     value: {
-      version: FORMAT_VERSION,
+      version: formatVersion,
       kind,
       payloadLength,
       headerBytes,

@@ -6,7 +6,8 @@
 //   - 텍스트는 deflate(방식 8), asset과 폴더는 저장(방식 0)이다. ZIP64를 쓰지 않는다.
 // - 항목 순서는 호출자가 정한다. 같은 입력이면 같은 조각이 나온다.
 // - 섞는 조각은 `scramble`이 참이다: 로컬 헤더, 표시한 항목의 본문, 중앙 디렉터리와 끝 레코드.
-//   섞는 일은 `seal.ts`가 한다(`metadata-scramble.ts`가 같은 범위를 푼다).
+//   포맷 버전 1은 이 표시대로 `seal.ts`가 섞는다(`metadata-scramble.ts`가 같은 범위를 푼다).
+//   포맷 버전 2는 표시와 상관없이 모든 조각을 섞는다(`full-scramble.ts`).
 // - 규칙은 `docs/format.md`의 "ZIP과 manifest"에 있다.
 import { deflateSync } from "fflate";
 import { readBlobBytes } from "./blob";
@@ -94,8 +95,11 @@ export type ZipPart =
       /** 입력 asset `Blob` 그대로 */
       bytes: Blob;
 
-      /** 섞지 않는 범위. asset 본문은 늘 평문 */
+      /** 섞지 않는 범위. asset 본문은 늘 평문. ZIP 전체를 섞는 버전은 `full-scramble.ts`가 따로 섞는다. */
       scramble: false;
+
+      /** 항목의 ZIP 이름. 섞으려고 `Blob`을 다시 읽다 실패하면 `ZipSourceReadError`에 담는다. */
+      name: string;
     };
 
 /** 쓴 ZIP. */
@@ -249,7 +253,7 @@ export async function writeZip(
       parts.push(
         body instanceof Uint8Array
           ? { bytes: body, scramble: source.scrambleBody === true }
-          : { bytes: body, scramble: false },
+          : { bytes: body, scramble: false, name: source.name },
       );
     }
     const entry = writeCentral(fields);

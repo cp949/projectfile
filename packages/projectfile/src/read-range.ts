@@ -19,14 +19,17 @@ export interface ByteRange {
   end: number;
 }
 
-/** 입력에서 범위를 읽고 asset 범위를 `Blob`으로 내보내는 방법. */
-export interface RangeSource {
+/** 입력에서 범위를 읽는 방법. 좌표는 파일 위치다. */
+export interface RangeReader {
   /**
    * 범위를 읽어 `ranges`와 같은 순서로 돌려준다. 읽지 못하거나 범위보다 짧게 읽히면 거부(reject)한다.
    * `Blob`이면 붙어 있거나 겹친 범위를 읽기 한 번으로 묶는다. 돌려주는 뷰는 서로 같은 버퍼를 쓸 수 있다.
    */
   read(ranges: readonly ByteRange[]): Promise<Uint8Array[]>;
+}
 
+/** 입력에서 범위를 읽고 asset 범위를 `Blob`으로 내보내는 방법. */
+export interface RangeSource extends RangeReader {
   /** 범위를 `Blob`으로 만든다. `Blob` 입력이면 읽지 않고 `input.slice`를 쓴다. */
   slice(range: ByteRange): Blob;
 }

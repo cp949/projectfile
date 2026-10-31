@@ -281,11 +281,12 @@ export async function buildVectors(lib) {
   const files = new Map();
   const cases = [];
 
-  const encode = async (project, kind = KIND, scrambleKey) => {
+  const encode = async (project, kind = KIND, scrambleKey, scrambleScope) => {
     const result = await lib.encodeProjectFile({
       ...project,
       kind,
       scrambleKey,
+      scrambleScope,
       limits: LIMITS,
       rules: {
         maxPathLength: RULES.maxPathLength,
@@ -350,6 +351,15 @@ export async function buildVectors(lib) {
     expectedFolders: ["빈폴더", "img", "img/깊은", "한글"],
   };
 
+  // 마지막 ZIP 항목이 asset이다. 버전 2에서 asset 본문 손상을 헤더 CRC가 잡는 사례에 쓴다.
+  const assetLast = {
+    entries: [
+      { path: "a.txt", type: "text", data: "가나다" },
+      { path: "b.bin", type: "asset", data: noise(16) },
+    ],
+    expectedFolders: [],
+  };
+
   // 정상 파일.
   const base = await encode(small);
   const normal = (name, bytes, project, extra = {}) =>
@@ -369,6 +379,13 @@ export async function buildVectors(lib) {
   const empty = { entries: [], expectedFolders: [] };
   normal("empty-project", await encode(empty), empty);
   normal("mixed-project", await encode(mixed), mixed);
+  // 포맷 버전 2. ZIP 전체를 scramble한다.
+  normal("full-scramble", await encode(small, KIND, undefined, "all"), small);
+  normal(
+    "full-scramble-mixed",
+    await encode(mixed, KIND, undefined, "all"),
+    mixed,
+  );
 
   // 헤더 실패. `readProjectFileHeader`와 `decodeProjectFile`이 같은 이유로 거부한다.
   /** 복사본의 바이트를 고친다. `[위치, 값]` 목록이다. */
@@ -392,9 +409,9 @@ export async function buildVectors(lib) {
   headerFail("magic-truncated", base.slice(0, 3), "bad-magic");
   headerFail(
     "unsupported-version",
-    patched(base, [4, 2]),
+    patched(base, [4, 3]),
     "unsupported-version",
-    { version: 2 },
+    { version: 3 },
   );
   headerFail("kind-length-0", patched(base, [5, 0]), "kind-invalid");
   headerFail("kind-length-65", patched(base, [5, 65]), "kind-invalid");
@@ -443,6 +460,19 @@ export async function buildVectors(lib) {
     header: headerOk,
     decode: { ok: false, reason: "crc-mismatch" },
   });
+
+  // 버전 2는 헤더 CRC가 ZIP 전체를 본다. 마지막 항목(asset)의 마지막 본문 바이트는 `centralStart - 1`이다.
+  // 버전 1이면 이 바이트는 CRC 범위 밖이라 그대로 열린다.
+  const assetFull = await encode(assetLast, KIND, undefined, "all");
+  normal("full-scramble-asset-last", assetFull, assetLast);
+  const assetHeader = headerOf(assetFull);
+  const centralStart = new DataView(assetFull.buffer).getUint32(14, true);
+  const assetAt = assetHeader.headerBytes + centralStart - 1;
+  add(
+    "full-scramble-crc-mismatch-asset",
+    patched(assetFull, [assetAt, assetFull[assetAt] ^ 0xff]),
+    { header: assetHeader, decode: { ok: false, reason: "crc-mismatch" } },
+  );
 
   // 이름 검사 실패. 헤더는 통과하고 `decodeProjectFile`만 이름 규칙으로 거부한다.
   // 인코더는 이 파일을 만들지 않으므로 직접 조립한다. 조립기가 맞는지는 정상 파일의 바이트로 먼저 확인한다.

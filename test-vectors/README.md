@@ -40,7 +40,7 @@ scramble 중간값:
 결과 모양:
 
 - 헤더 성공: `{ ok: true, version, kind, payloadLength, headerBytes, keyCheck }`.
-- 헤더 실패: `{ ok: false, reason }`. 모르는 버전은 `version`을 더한다.
+- 헤더 실패: `{ ok: false, reason }`. 모르는 버전(1과 2가 아닌 값)은 `version`을 더한다.
 - 디코딩 성공: `{ ok: true, folders, entries }`. 텍스트 항목은 `text`, asset 항목은 본문 바이트 `hex`를 가진다.
   - 순서까지 비교한다. `entries`는 manifest 순서, `folders`는 중앙 디렉터리 순서다(`docs/format.md`의 "항목 순서").
 - 디코딩 실패: `{ ok: false, reason }`. `invalid-name`은 걸린 항목의 `path`와 `cause`를 더한다.
@@ -50,6 +50,13 @@ scramble 중간값:
 
 - `header`가 실패면 `decode`는 같은 실패다. 두 함수가 같은 헤더 검사를 쓴다.
 - `header`가 성공이고 `decode`가 실패면 헤더 뒤 단계에서 걸린 사례다. `scramble-key-mismatch`와 `crc-mismatch`가 있다. `crc-mismatch`는 헤더의 CRC 필드를, `crc-mismatch-local`은 첫 로컬 헤더의 서명 바이트를 바꾼 파일이다. 뒤 사례는 CRC를 로컬 헤더 해석보다 먼저 봐야 이 이유가 나온다. 중앙 디렉터리는 범위를 정할 때 해석하므로 거기를 바꾸면 `zip-corrupt`일 수 있다.
+
+포맷 버전 2 사례:
+
+- `full-scramble`, `full-scramble-mixed`, `full-scramble-asset-last`는 ZIP 전체를 섞은 정상 파일이다. `header.version`이 2다.
+- `full-scramble-crc-mismatch-asset`은 `full-scramble-asset-last`의 마지막 asset 본문 바이트(`centralStart - 1`)를 바꾼 파일이다.
+  - 버전 2의 헤더 CRC가 ZIP 전체를 보므로 `crc-mismatch`다.
+  - 같은 위치를 바꾼 버전 1 파일은 CRC 범위 밖이라 열린다.
 
 이름 검사 사례:
 

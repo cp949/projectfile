@@ -9,13 +9,16 @@
 //   텍스트 본문 손상은 텍스트 항목을 푼 뒤 ZIP 항목 CRC32로 본다. asset 손상은 보지 않는다.
 // - asset은 입력의 본문 범위를 `Blob`으로 돌려준다. `Blob` 입력이면 `input.slice`, `Uint8Array` 입력이면 `new Blob`이다.
 //   그래서 asset 항목은 저장(방식 0)이어야 한다.
+// - 포맷 버전 2(ZIP 전체 scramble)는 읽는 즉시 평문으로 돌리는 읽기 수단을 쓴다(`full-scramble.ts`).
+//   헤더 CRC가 ZIP 전체를 보므로 payload를 조각으로 모두 읽는다. asset은 평문을 읽어 새 `Blob`으로 만든다.
 // - 규칙은 `docs/format.md`의 "검사 순서"에 있다.
 import { checkProject, type PlannedNode } from "./check";
 import { crc32 } from "./crc32";
 import type { DecodedProjectEntry } from "./entry";
 import { fail, type ProjectFileResult } from "./errors";
+import { createUnscrambledReader, plainBlob } from "./full-scramble";
 import { readHead } from "./header-info";
-import { isProjectKind, type ProjectKind } from "./header";
+import { FORMAT_VERSION_ALL, isProjectKind, type ProjectKind } from "./header";
 import {
   assertLimits,
   maxProjectFileBytes,
@@ -83,14 +86,15 @@ export interface DecodedProject {
  *    풀린 크기 합계가 `maxUncompressedBytes`를 넘는 경우는 10단계의 `limit-exceeded`다.
  *    `Blob` 입력은 헤더(앞 86바이트)부터 읽고, 이후 단계가 필요한 범위를 읽는다. 읽는 중 실패해도 `read-failed`다.
  * 2. magic. 틀리면 `bad-magic`.
- * 3. 헤더 길이와 포맷 버전. 22바이트 미만이면 `length-mismatch`, 모르는 버전은 `unsupported-version`.
+ * 3. 헤더 길이와 포맷 버전. 22바이트 미만이면 `length-mismatch`, 1이나 2가 아닌 버전은 `unsupported-version`.
  * 4. kind. 길이가 0이거나 64를 넘으면 `kind-invalid`. 22 + N바이트 미만이면 `length-mismatch`.
  *    문자열이 규칙을 어기면 `kind-invalid`, 규칙을 지켰지만 기대한 kind와 다르면 `kind-mismatch`.
  * 5. 전체 크기. 22 + N + payload 길이와 다르면 `length-mismatch`.
  * 6. 키. 헤더의 키 확인값과 같은 키가 없으면 `scramble-key-mismatch`.
  * 7. 복원과 CRC32. 메타데이터 범위와 manifest 본문을 되돌린다.
  *    끝 레코드의 항목 수가 `maxFiles + maxFolders + 2`를 넘으면 로컬 헤더를 읽기 전에 `zip-corrupt`.
- *    범위를 정할 수 없으면 `zip-corrupt`, 그 범위의 CRC가 헤더와 다르면 `crc-mismatch`.
+ *    범위를 정할 수 없으면 `zip-corrupt`, CRC가 헤더와 다르면 `crc-mismatch`.
+ *    CRC 범위는 버전 1이 메타데이터 범위와 manifest 본문, 버전 2가 ZIP 전체다.
  * 8. ZIP 항목 목록. 암호화 항목, 읽지 못하는 이름, 겹치는 이름, 틀린 로컬 헤더 시그니처, `centralStart`를 넘는 압축 데이터는 `zip-corrupt`.
  *    중앙 디렉터리의 구조 손상은 7단계가 먼저 거부한다.
  * 9. manifest. 선언 크기가 상한을 넘거나 형식이 틀리면 `manifest-invalid`, 풀리지 않으면 `zip-corrupt`.
@@ -127,8 +131,13 @@ export async function decodeProjectFile(
   if (!header.ok) return header;
   const key = findKey(keys, header.value.keyCheck);
   if (key === null) return fail({ reason: "scramble-key-mismatch" });
+  // 버전 2는 읽는 즉시 평문으로 돌린다. 이후 읽기는 모두 이 수단을 거친다.
+  const whole = header.value.formatVersion === FORMAT_VERSION_ALL;
+  const reader = whole
+    ? createUnscrambledReader(source, header.value.headerBytes, key)
+    : source;
   const opened = await openZip(
-    source,
+    reader,
     header.value,
     key,
     maxZipEntries(limits),
@@ -145,7 +154,7 @@ export async function decodeProjectFile(
   }
   const manifestBytes = inflateEntry(manifestBody, manifestEntry);
   if (manifestBytes === null) return fail({ reason: "zip-corrupt" });
-  const manifest = readManifest(manifestBytes);
+  const manifest = readManifest(manifestBytes, header.value.formatVersion);
   if (!manifest.ok) return manifest;
   if (manifest.value.kind !== headerKind) {
     return fail({ reason: "manifest-kind-mismatch" });
@@ -194,7 +203,7 @@ export async function decodeProjectFile(
   );
   let stored: Uint8Array[];
   try {
-    stored = await source.read(
+    stored = await reader.read(
       missing.map(({ info }) => ({
         start: header.value.headerBytes + info.dataStart,
         end: header.value.headerBytes + info.dataStart + info.compressedSize,
@@ -225,11 +234,16 @@ export async function decodeProjectFile(
         return fail({ reason: "zip-corrupt" });
       }
       const start = header.value.headerBytes + info.dataStart;
-      decoded.push({
-        path,
-        type: "asset",
-        data: source.slice({ start, end: start + info.size }),
-      });
+      let data: Blob;
+      try {
+        // 버전 2의 본문은 섞여 있다. 입력의 `slice`로는 원본이 되지 않아 평문을 읽어 새 `Blob`을 만든다.
+        data = whole
+          ? await plainBlob(reader, start, start + info.size)
+          : source.slice({ start, end: start + info.size });
+      } catch {
+        return fail({ reason: "read-failed" });
+      }
+      decoded.push({ path, type: "asset", data });
       continue;
     }
     // 유효한 deflate 스트림은 비어 있을 수 없다. 선언 크기가 0이면 푼 길이가 같아 통과하므로 따로 거른다.

@@ -6,7 +6,7 @@
 - 목적은 인라인 보안 검사 장비의 오탐을 피하는 것이다.
   - 소스 텍스트를 그대로 보내면 장비가 오탐해 차단한 적이 있다.
   - 일반 ZIP은 장비가 열어 본다.
-  - 그래서 ZIP 메타데이터와 `manifest.json` 본문을 섞는다(scramble).
+  - 그래서 ZIP 메타데이터와 `manifest.json` 본문을 섞는다(scramble). 옵션으로 ZIP 전체를 섞을 수 있다("scramble 범위").
   - 장비가 통과시키는지는 장비마다 다르다. 라이브러리는 통과를 보장하지 않는다.
 - 파일 트리, 화면, 에디터를 모른다. 바이트와 항목만 안다.
 - 브라우저와 Node에서 돈다. `Blob`, `Response`, `TextEncoder`, `TextDecoder` 전역이 필요하다.
@@ -123,7 +123,7 @@ if (result.ok) {
 ```
 
 - 입력은 `Blob` 또는 `Uint8Array`다. 입력 `Uint8Array`는 바꾸지 않는다.
-- `Blob` 입력은 필요한 범위만 읽는다. asset 본문은 읽지 않는다. 범위는 [`docs/format.md`](https://github.com/cp949/projectfile/blob/main/docs/format.md)의 "읽기 방식"에 있다.
+- `Blob` 입력은 필요한 범위만 읽는다. asset 본문은 읽지 않는다. 범위는 [`docs/format.md`](https://github.com/cp949/projectfile/blob/main/docs/format.md)의 "읽기 방식"에 있다. ZIP 전체를 섞은 파일(포맷 버전 2)은 입력 전체를 읽는다("scramble 범위").
 - 인코딩의 asset `data`는 `Blob` 또는 `Uint8Array`다. text `data`는 `string`이다.
 - text `data`의 짝 없는 서로게이트(U+D800..U+DFFF 코드 유닛)는 UTF-8 인코딩에서 U+FFFD로 바뀌어 저장된다.
   - 오류로 알리지 않는다. 디코딩 결과는 입력과 같지 않다.
@@ -141,6 +141,7 @@ if (result.ok) {
 | ----------------------------------------------------------------------------------- | ------------ | --------------------------------------------------- | --------------------------------------------------------------- |
 | `kind`가 정규식 `^[a-z0-9][a-z0-9._-]{0,63}$`를 어긴다. 문자열이 아니어도 같다.     | `Error`      | `kind가 규칙을 어겼다:`                             | `encodeProjectFile`, `decodeProjectFile`                        |
 | `scrambleKey`가 길이 16의 `Uint8Array`가 아니다.                                    | `RangeError` | `scrambleKey는 길이 16의 Uint8Array여야 한다`       | `encodeProjectFile`                                             |
+| `scrambleScope`가 `"metadata"`나 `"all"`이 아니다.                                  | `Error`      | `scrambleScope가 규칙을 어겼다:`                    | `encodeProjectFile`                                             |
 | `scrambleKeys`가 키 하나 이상인 배열이 아니다.                                      | `RangeError` | `scrambleKeys는 키가 하나 이상인 배열이어야 한다`   | `decodeProjectFile`                                             |
 | `scrambleKeys`의 키가 길이 16의 `Uint8Array`가 아니다.                              | `RangeError` | `scrambleKeys의 키는 길이 16의 Uint8Array여야 한다` | `decodeProjectFile`                                             |
 | `scrambleKeys`에 키 확인값이 같은 키가 둘 이상이다.                                 | `RangeError` | `scrambleKeys에 키 확인값이 같은 키가 둘 이상이다`  | `decodeProjectFile`                                             |
@@ -151,7 +152,7 @@ if (result.ok) {
 
 - `encodeProjectFile`과 `decodeProjectFile`은 `async`라서 동기로 던지지 않고 반환한 `Promise`를 reject한다.
 - `maxProjectFileBytes`는 동기로 던진다.
-- 검사 순서는 `kind`, 키, `rules`, `limits`다. 여러 조건을 어기면 먼저 걸린 하나만 던진다.
+- 검사 순서는 `kind`, 키, `scrambleScope`, `rules`, `limits`다. 여러 조건을 어기면 먼저 걸린 하나만 던진다.
 - 타입을 어긴 그 밖의 인자(배열이 아닌 `entries` 등)는 검사하지 않는다. `rules`의 함수가 던진 오류는 바꾸지 않고 전파한다.
 
 ## asset Blob
@@ -160,12 +161,13 @@ if (result.ok) {
 - 디코딩한 asset `data`는 `Blob`이다.
   - `Blob` 입력이면 입력을 `slice`한 `Blob`이다.
   - `Uint8Array` 입력이면 그 범위를 복사해 `new Blob`으로 만든 것이다.
+  - ZIP 전체를 섞은 파일(포맷 버전 2)이면 본문을 읽어 되돌린 새 `Blob`이다. 입력의 `slice`가 아니다.
 - 큰 파일은 `File`이나 `Blob`을 그대로 넘긴다. `Uint8Array` 입력은 asset마다 범위를 복사한다.
 - Chrome은 메모리에 있는 `Blob` 총량에 한계가 있다. 이 저장소 측정에서는 약 500 MiB였다([ADR-0001](https://github.com/cp949/projectfile/blob/main/docs/adr/0001-uncompressed-bytes-ceiling.md)).
   - 한계를 넘은 뒤에 만든 `Blob`은 읽을 때 실패한다.
   - 다 쓴 입력 asset `Blob`과 asset `Blob`의 참조는 놓는다.
 - `Blob` 입력의 원본이 바뀌거나 사라진 뒤에 asset `Blob`을 읽으면 읽기가 실패할 수 있다. 입력 `Blob`과 asset `Blob`의 수명은 호출자 책임이다.
-- 디코딩은 asset 본문을 읽지 않는다. 손상도 검사하지 않는다("포맷 버전").
+- 포맷 버전 1의 디코딩은 asset 본문을 읽지 않는다. 손상도 검사하지 않는다("포맷 버전").
 
 ## rules
 
@@ -237,6 +239,35 @@ const rules: ProjectFileRules = {
 - 옵션의 `kind`가 규칙을 어기면 던진다.
 - 파일 헤더의 kind가 규칙을 어기면 `kind-invalid`다.
 
+## scramble 범위
+
+인코딩 옵션 `scrambleScope`가 scramble하는 범위를 정한다.
+
+| `scrambleScope`      | 포맷 버전 | 섞는 범위                                                           |
+| -------------------- | --------- | ------------------------------------------------------------------- |
+| `"metadata"`(기본값) | 1         | ZIP 메타데이터(로컬 헤더, 중앙 디렉터리, 끝 레코드)와 manifest 본문 |
+| `"all"`              | 2         | ZIP 전체. 텍스트와 asset 본문도 섞는다                              |
+
+```ts
+import { encodeProjectFile } from "@cp949/projectfile";
+
+const result = await encodeProjectFile({
+  kind: "acme.blocks",
+  entries,
+  rules,
+  limits,
+  scrambleScope: "all",
+});
+```
+
+- 디코딩은 옵션이 없다. 헤더의 포맷 버전을 보고 두 버전을 모두 연다.
+- 버전 1은 텍스트와 asset 본문을 섞지 않아서 평문이 남는 경우가 있다. 비 ASCII 텍스트의 stored 블록과 asset 원본이다. 버전 2는 남지 않는다.
+- 버전 2는 입력 전체를 읽는다. 인코딩은 asset을 두 번 읽고, 디코딩은 payload 전체와 asset 본문을 읽는다.
+  - Node에서 64 MiB asset 하나를 한 번 잰 값이다. 인코딩은 버전 1이 107 ms, 버전 2가 278 ms였다. 디코딩은 6 ms와 332 ms였다([ADR-0007](https://github.com/cp949/projectfile/blob/main/docs/adr/0007-full-scramble-version.md)).
+  - 브라우저는 재지 않았다.
+- 버전 2도 기밀성을 약속하지 않는다("scramble은 암호가 아니다").
+- 버전 2 파일을 헤더만 읽는 구현(서버)은 버전 값 2를 받아야 한다.
+
 ## scramble 키
 
 scramble에 쓰는 키는 16바이트 `Uint8Array`다. 길이가 다르면 던진다.
@@ -297,7 +328,7 @@ if (result.ok) {
 
 | 필드            | 내용                                                      |
 | --------------- | --------------------------------------------------------- |
-| `version`       | 포맷 버전. 1                                              |
+| `version`       | 포맷 버전. 1이나 2                                        |
 | `kind`          | 헤더의 kind 문자열                                        |
 | `payloadLength` | payload(ZIP 전체)의 바이트 길이                           |
 | `headerBytes`   | 헤더의 바이트 길이. 22 + kind 길이                        |
@@ -311,12 +342,14 @@ if (result.ok) {
 
 ## 포맷 버전
 
-포맷 버전은 1 하나다. 헤더와 manifest가 적는다. 바이트 배치와 검사 순서는 [`docs/format.md`](https://github.com/cp949/projectfile/blob/main/docs/format.md)에 있다.
+포맷 버전은 1과 2다. 헤더와 manifest가 적는다. 바이트 배치와 검사 순서는 [`docs/format.md`](https://github.com/cp949/projectfile/blob/main/docs/format.md)에 있다.
 
 - 헤더는 magic `OCOD`, 포맷 버전, kind, payload 길이, CRC32, 키 확인값이다. scramble하지 않는다.
-- 모르는 헤더 버전은 `unsupported-version`으로 거부한다.
-- ZIP 메타데이터(로컬 헤더, 중앙 디렉터리, 끝 레코드)와 manifest 본문을 scramble한다. 헤더 CRC는 그 범위만 본다.
-- 열 때 텍스트 본문은 ZIP 항목 CRC32로 검사한다. asset 본문 손상은 검사하지 않는다.
+- 1과 2가 아닌 헤더 버전은 `unsupported-version`으로 거부한다.
+- 버전 1: ZIP 메타데이터(로컬 헤더, 중앙 디렉터리, 끝 레코드)와 manifest 본문을 scramble한다. 헤더 CRC는 그 범위만 본다.
+  - 열 때 텍스트 본문은 ZIP 항목 CRC32로 검사한다. asset 본문 손상은 검사하지 않는다.
+- 버전 2: ZIP 전체를 scramble한다. 헤더 CRC가 ZIP 전체를 본다. asset 손상도 열 때 `crc-mismatch`로 거부한다.
+- 인코딩이 `scrambleScope`로 버전을 고른다("scramble 범위"). 디코딩은 헤더 버전을 보고 알아서 연다.
 
 ## 실패 이유
 

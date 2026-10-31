@@ -11,7 +11,7 @@ export type {
   ProjectNameCause,
 } from "./errors";
 export { MAX_HEADER_BYTES } from "./header";
-export type { ProjectKind } from "./header";
+export type { ProjectKind, ScrambleScope } from "./header";
 export { readProjectFileHeader } from "./header-info";
 export type { ProjectFileHeaderInfo } from "./header-info";
 export {

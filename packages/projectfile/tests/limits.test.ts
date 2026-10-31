@@ -7,7 +7,7 @@
 /// <reference lib="es2024.arraybuffer" />
 import { strToU8, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
-import { FORMAT_VERSION } from "../src/header";
+import { FORMAT_VERSION_METADATA } from "../src/header";
 import {
   decodeProjectFile,
   encodeProjectFile,
@@ -302,7 +302,7 @@ describe("프로젝트 파일 manifest 상한", () => {
   const entriesForManifestBytes = (target: number): ProjectEntry[] => {
     const bytesOf = (entries: ProjectEntry[]) =>
       writeManifest({
-        formatVersion: FORMAT_VERSION,
+        formatVersion: FORMAT_VERSION_METADATA,
         kind: KIND,
         files: entries.map(({ path, type }) => ({ path, type })),
       }).length;

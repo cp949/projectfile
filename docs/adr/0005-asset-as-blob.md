@@ -6,6 +6,8 @@
 - 인코딩은 asset 본문을 읽어 모으지 않고 출력 `Blob`의 조각으로 넣는다. asset은 압축하지 않는다.
 - ZIP 쓰기를 직접 구현한다. 텍스트와 manifest 압축만 fflate의 raw deflate를 쓴다.
 
+이 결정은 포맷 버전 1에 해당한다. 버전 2는 asset도 섞으므로 이 구조를 쓰지 못한다(ADR-0007).
+
 쓰는 필드, 읽는 범위, `Uint8Array` 입력의 복사는 `docs/format.md`의 "ZIP 쓰기", "읽기 방식", "알려진 한계"에 있다.
 
 ## 이유

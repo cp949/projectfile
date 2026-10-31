@@ -5,7 +5,7 @@
 // - 폴더는 ZIP의 `files/<경로>/` 항목이 담는다. manifest에 적지 않는다.
 // - 규칙은 `docs/format.md`의 "ZIP과 manifest"에 있다.
 import { fail, type ProjectFileResult } from "./errors";
-import { FORMAT_VERSION, isProjectKind, type ProjectKind } from "./header";
+import { isProjectKind, type ProjectKind } from "./header";
 
 /** ZIP 안 manifest 항목 이름. */
 export const MANIFEST_NAME = "manifest.json";
@@ -52,12 +52,15 @@ export function writeManifest(manifest: Manifest): Uint8Array {
  * manifest를 읽어 검사한다. 틀리면 `manifest-invalid`다.
  * - 올바른 UTF-8 JSON 객체여야 한다. 잘못된 바이트를 U+FFFD로 바꿔 읽지 않는다.
  * - 맨 앞 BOM 하나는 `TextDecoder`가 떼고 읽는다. 둘째 BOM부터는 JSON 문법 위반이다.
- * - `formatVersion`은 `FORMAT_VERSION`(헤더의 버전)과 같아야 한다.
+ * - `formatVersion`은 헤더의 버전(`formatVersion` 인자)과 같아야 한다.
  * - `kind`는 kind 규칙을 지키는 문자열이다. 헤더와 같은지는 호출자가 본다.
  * - `files`는 `path`(문자열)와 `type`(`text`나 `asset`)을 가진 객체의 배열이다. 경로가 겹치면 거부한다.
  * - 추가 필드는 버린다.
  */
-export function readManifest(bytes: Uint8Array): ProjectFileResult<Manifest> {
+export function readManifest(
+  bytes: Uint8Array,
+  headerVersion: number,
+): ProjectFileResult<Manifest> {
   const invalid = fail({ reason: "manifest-invalid" });
   let value: unknown;
   try {
@@ -69,7 +72,7 @@ export function readManifest(bytes: Uint8Array): ProjectFileResult<Manifest> {
   const formatVersion = own(value, "formatVersion");
   const kind = own(value, "kind");
   const files = own(value, "files");
-  if (formatVersion !== FORMAT_VERSION) return invalid;
+  if (formatVersion !== headerVersion) return invalid;
   if (!isProjectKind(kind)) return invalid;
   if (!Array.isArray(files)) return invalid;
   const seen = new Set<string>();

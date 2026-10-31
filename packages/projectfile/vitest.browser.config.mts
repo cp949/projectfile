@@ -13,10 +13,11 @@ export default defineConfig({
     },
   },
   test: {
-    // `Blob` 읽기 경로를 다루는 Node 시험 두 파일을 그대로 한 번 더 돌리고, 브라우저 전용 시험은 `tests-browser/`에 둔다.
+    // `Blob` 읽기 경로를 다루는 Node 시험 세 파일을 그대로 한 번 더 돌리고, 브라우저 전용 시험은 `tests-browser/`에 둔다.
     include: [
       "tests/decode-read.test.ts",
       "tests/roundtrip.test.ts",
+      "tests/full-scramble.test.ts",
       "tests-browser/**/*.test.ts",
     ],
     // 커버리지 임계값은 Node 시험 기준이다. 이 설정은 커버리지를 측정하지 않는다.

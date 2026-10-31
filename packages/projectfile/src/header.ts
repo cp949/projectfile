@@ -5,14 +5,15 @@
 //
 // ```txt
 // [0..3]    magic "OCOD"
-// [4]       포맷 버전 (1)
+// [4]       포맷 버전 (1 또는 2)
 // [5]       kind 길이 N (1 이상 64 이하)
 // [6..9]    payload 길이 (LE uint32). payload는 ZIP 전체다
-// [10..13]  CRC32 (LE uint32). scramble 전 ZIP 메타데이터 범위와 manifest 본문 기준 (`metadata-scramble.ts`)
+// [10..13]  CRC32 (LE uint32). scramble 전 평문 기준. 버전 1은 ZIP 메타데이터 범위와 manifest 본문(`metadata-scramble.ts`),
+//           버전 2는 ZIP 전체
 // [14..17]  centralStart: ZIP 안 중앙 디렉터리 시작 위치 (LE uint32)
 // [18..21]  키 확인값: scramble 키 16바이트의 CRC32 (LE uint32)
 // [22..21+N] kind 문자열 (ASCII)
-// [22+N..]  payload = 메타데이터 범위와 manifest 본문만 scramble한 ZIP
+// [22+N..]  payload = scramble한 ZIP. 버전 1은 메타데이터 범위와 manifest 본문만, 버전 2는 전체
 // ```
 import { fail, type ProjectFileResult } from "./errors";
 
@@ -23,8 +24,23 @@ import { fail, type ProjectFileResult } from "./errors";
  */
 export type ProjectKind = string;
 
-/** 포맷 버전. 헤더와 manifest가 이 값을 적는다. */
-export const FORMAT_VERSION: number = 1;
+/** 포맷 버전 1. ZIP 메타데이터 범위와 manifest 본문만 scramble한다. */
+export const FORMAT_VERSION_METADATA = 1;
+
+/** 포맷 버전 2. ZIP 전체를 scramble한다. */
+export const FORMAT_VERSION_ALL = 2;
+
+/**
+ * scramble하는 범위. 인코딩 옵션이고 헤더의 포맷 버전으로 파일에 남는다.
+ * - `"metadata"`: ZIP 메타데이터 범위와 manifest 본문(버전 1).
+ * - `"all"`: ZIP 전체(버전 2).
+ */
+export type ScrambleScope = "metadata" | "all";
+
+/** 범위에 맞는 포맷 버전. */
+export function formatVersionOf(scope: ScrambleScope): number {
+  return scope === "all" ? FORMAT_VERSION_ALL : FORMAT_VERSION_METADATA;
+}
 
 /** kind를 뺀 고정 헤더 길이. */
 export const FIXED_HEADER_BYTES: number = 22;
@@ -57,7 +73,10 @@ export interface ProjectFileHeader {
   /** payload(ZIP 전체) 길이(바이트) */
   payloadLength: number;
 
-  /** scramble 전 메타데이터 범위와 manifest 본문의 CRC32 */
+  /** 포맷 버전. 1 또는 2 */
+  formatVersion: number;
+
+  /** scramble 전 평문의 CRC32. 범위는 버전을 따른다. */
   crc: number;
 
   /** ZIP 안 중앙 디렉터리 시작 위치 */
@@ -70,9 +89,10 @@ export interface ProjectFileHeader {
   headerBytes: number;
 }
 
-/** 헤더를 만든다. kind는 규칙을 지킨 값이어야 한다. */
+/** 헤더를 만든다. kind는 규칙을 지킨 값이고 `formatVersion`은 1이나 2여야 한다. */
 export function writeHeader(
   kind: ProjectKind,
+  formatVersion: number,
   payloadLength: number,
   crc: number,
   centralStart: number,
@@ -81,7 +101,7 @@ export function writeHeader(
   const header = new Uint8Array(headerLengthOf(kind.length));
   const view = new DataView(header.buffer);
   header.set(MAGIC, 0);
-  header[4] = FORMAT_VERSION;
+  header[4] = formatVersion;
   header[5] = kind.length;
   view.setUint32(6, payloadLength, true);
   view.setUint32(10, crc, true);
@@ -96,7 +116,7 @@ export function writeHeader(
 /**
  * 파일 앞부분에서 헤더를 읽고 검사한다. 처음 걸린 이유를 돌려준다.
  * 1. 앞 4바이트가 magic이 아니거나 4바이트가 안 되면 `bad-magic`.
- * 2. 22바이트 미만이면 `length-mismatch`, 모르는 버전이면 `unsupported-version`.
+ * 2. 22바이트 미만이면 `length-mismatch`, 1이나 2가 아닌 버전이면 `unsupported-version`.
  * 3. kind 길이가 0이거나 64를 넘으면 `kind-invalid`.
  *    22 + N바이트 미만이면 `length-mismatch`.
  *    kind 문자열이 규칙을 어기면 `kind-invalid`, 규칙을 지켰지만 `expectedKind`와 다르면 `kind-mismatch`.
@@ -118,7 +138,7 @@ export function readHeader(
   }
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const version = view.getUint8(4);
-  if (version !== FORMAT_VERSION) {
+  if (version !== FORMAT_VERSION_METADATA && version !== FORMAT_VERSION_ALL) {
     return fail({ reason: "unsupported-version", version });
   }
   const kindLength = view.getUint8(5);
@@ -142,6 +162,7 @@ export function readHeader(
     ok: true,
     value: {
       kind,
+      formatVersion: version,
       payloadLength,
       crc: view.getUint32(10, true),
       centralStart: view.getUint32(14, true),

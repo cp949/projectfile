@@ -235,6 +235,91 @@
       }
     },
     {
+      "name": "full-scramble",
+      "file": "full-scramble.bin",
+      "kind": "example.blocks",
+      "scrambleKeys": null,
+      "header": {
+        "ok": true,
+        "version": 2,
+        "kind": "example.blocks",
+        "payloadLength": 670,
+        "headerBytes": 36,
+        "keyCheck": 3223634613
+      },
+      "decode": {
+        "ok": true,
+        "folders": [],
+        "entries": [
+          {
+            "path": "index.html",
+            "type": "text",
+            "text": "<html></html>"
+          },
+          {
+            "path": "sketch.js",
+            "type": "text",
+            "text": "let a = 1;"
+          },
+          {
+            "path": "style.css",
+            "type": "text",
+            "text": "body {}"
+          }
+        ]
+      }
+    },
+    {
+      "name": "full-scramble-mixed",
+      "file": "full-scramble-mixed.bin",
+      "kind": "example.blocks",
+      "scrambleKeys": null,
+      "header": {
+        "ok": true,
+        "version": 2,
+        "kind": "example.blocks",
+        "payloadLength": 1466,
+        "headerBytes": 36,
+        "keyCheck": 3223634613
+      },
+      "decode": {
+        "ok": true,
+        "folders": [
+          "빈폴더",
+          "img",
+          "img/깊은",
+          "한글"
+        ],
+        "entries": [
+          {
+            "path": "img/깊은/소리.bin",
+            "type": "asset",
+            "hex": "05048ba2e81c7e8c98c80abef712b375"
+          },
+          {
+            "path": "img/고양이.png",
+            "type": "asset",
+            "hex": "05048ba2e81c7e8c98c80abef712b37565f567f3fea96c7f"
+          },
+          {
+            "path": "data.json",
+            "type": "text",
+            "text": "{\"가\":\"나\"}"
+          },
+          {
+            "path": "한글/메모.txt",
+            "type": "text",
+            "text": "안녕\n두 줄"
+          },
+          {
+            "path": "index.html",
+            "type": "text",
+            "text": "<html></html>"
+          }
+        ]
+      }
+    },
+    {
       "name": "bad-magic",
       "file": "bad-magic.bin",
       "kind": "example.blocks",
@@ -270,12 +355,12 @@
       "header": {
         "ok": false,
         "reason": "unsupported-version",
-        "version": 2
+        "version": 3
       },
       "decode": {
         "ok": false,
         "reason": "unsupported-version",
-        "version": 2
+        "version": 3
       }
     },
     {
@@ -436,6 +521,54 @@
         "version": 1,
         "kind": "example.blocks",
         "payloadLength": 670,
+        "headerBytes": 36,
+        "keyCheck": 3223634613
+      },
+      "decode": {
+        "ok": false,
+        "reason": "crc-mismatch"
+      }
+    },
+    {
+      "name": "full-scramble-asset-last",
+      "file": "full-scramble-asset-last.bin",
+      "kind": "example.blocks",
+      "scrambleKeys": null,
+      "header": {
+        "ok": true,
+        "version": 2,
+        "kind": "example.blocks",
+        "payloadLength": 526,
+        "headerBytes": 36,
+        "keyCheck": 3223634613
+      },
+      "decode": {
+        "ok": true,
+        "folders": [],
+        "entries": [
+          {
+            "path": "a.txt",
+            "type": "text",
+            "text": "가나다"
+          },
+          {
+            "path": "b.bin",
+            "type": "asset",
+            "hex": "05048ba2e81c7e8c98c80abef712b375"
+          }
+        ]
+      }
+    },
+    {
+      "name": "full-scramble-crc-mismatch-asset",
+      "file": "full-scramble-crc-mismatch-asset.bin",
+      "kind": "example.blocks",
+      "scrambleKeys": null,
+      "header": {
+        "ok": true,
+        "version": 2,
+        "kind": "example.blocks",
+        "payloadLength": 526,
         "headerBytes": 36,
         "keyCheck": 3223634613
       },

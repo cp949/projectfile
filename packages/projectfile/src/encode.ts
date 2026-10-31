@@ -1,18 +1,22 @@
 // 항목 목록을 프로젝트 파일 바이트로 만든다. 파일 트리, 화면, 전송을 모른다.
 // - 구조: 헤더 + scramble한 ZIP. ZIP은 `manifest.json`과 `files/<경로>` 항목이다.
-//   헤더 뒤에는 메타데이터 범위와 manifest 본문만 scramble한 ZIP이 온다(`seal.ts`).
+//   헤더 뒤에는 메타데이터 범위와 manifest 본문만 scramble한 ZIP(버전 1, `seal.ts`)이나
+//   ZIP 전체를 scramble한 ZIP(버전 2, `full-scramble.ts`)이 온다. 옵션 `scrambleScope`가 고른다.
 // - 텍스트는 deflate하고 asset은 압축하지 않는다. asset은 이미 압축된 형식이 많아 CPU만 쓴다.
-// - asset `Blob`은 읽어 복사하지 않는다. CRC32만 조각으로 읽어 계산하고 출력 `Blob`에 그대로 넣는다(`zip-write.ts`).
+// - 버전 1은 asset `Blob`을 읽어 복사하지 않는다. CRC32만 조각으로 읽어 계산하고 출력 `Blob`에 그대로 넣는다(`zip-write.ts`).
+//   버전 2는 asset을 섞어야 해서 조각으로 한 번 더 읽는다.
 // - 같은 입력은 같은 바이트가 된다. ZIP 수정 시각과 항목 순서를 고정한다.
 // - 규칙은 `docs/format.md`에 있다.
 import { checkProject, type PlannedNode } from "./check";
 import type { ProjectEntry } from "./entry";
 import { fail, type ProjectFileResult } from "./errors";
+import { sealZipWhole } from "./full-scramble";
 import {
-  FORMAT_VERSION,
+  formatVersionOf,
   headerLengthOf,
   isProjectKind,
   type ProjectKind,
+  type ScrambleScope,
 } from "./header";
 import {
   assertLimits,
@@ -61,6 +65,14 @@ export interface EncodeOptions {
 
   /** scramble 키 16바이트. 비우면 `DEFAULT_SCRAMBLE_KEY`다. 길이가 다르면 던진다. */
   scrambleKey?: Uint8Array;
+
+  /**
+   * scramble하는 범위. 비우면 `"metadata"`다. 다른 값이면 던진다.
+   * - `"metadata"`: ZIP 메타데이터 범위와 manifest 본문만 섞는다(포맷 버전 1).
+   * - `"all"`: ZIP 전체를 섞는다(포맷 버전 2). asset 본문도 섞고 헤더 CRC가 ZIP 전체를 본다.
+   *   인코딩과 디코딩이 asset을 조각으로 한 번 더 읽는다. 디코딩의 asset `Blob`은 입력의 `slice`가 아니라 새 `Blob`이다.
+   */
+  scrambleScope?: ScrambleScope;
 }
 
 /** 폴더 트리의 노드 하나. 폴더 항목과 그 안의 파일 항목을 모은다. */
@@ -132,9 +144,10 @@ function zipSources(
  * - 이름 규칙(`rules`)이나 한도를 어기면 만들지 않고 이유를 돌려준다. 디코딩이 거부할 파일은 만들지 않는다.
  * - manifest가 `MANIFEST_MAX_BYTES`를 넘으면 `manifest-too-large`를 돌려준다. 이름과 한도 검사를 통과한 뒤에 본다.
  * - 빈 폴더도 담는다.
- * - 규칙을 어긴 `kind`, 길이가 16이 아닌 `scrambleKey`, 잘못된 `rules.maxPathLength`와 `limits`는 던진다. 호출자 버그다.
+ * - 규칙을 어긴 `kind`, 길이가 16이 아닌 `scrambleKey`, 잘못된 `scrambleScope`, 잘못된 `rules.maxPathLength`와 `limits`는 던진다. 호출자 버그다.
  * - asset `Blob`을 읽지 못하면 던지지 않고 `read-failed`와 그 asset의 `path`를 돌려준다.
  *   ZIP에 쓰는 순서로 처음 읽지 못한 asset 하나만 알린다. 이름·한도·manifest 길이 검사를 통과한 뒤에 읽는다.
+ *   `scrambleScope`가 `"all"`이면 입력 크기 상한 비교 뒤 섞으려고 한 번 더 읽는다. 이 읽기의 실패도 같은 방식으로 알린다.
  */
 export async function encodeProjectFile(
   options: EncodeOptions,
@@ -145,6 +158,10 @@ export async function encodeProjectFile(
   }
   const key = options.scrambleKey ?? DEFAULT_KEY;
   assertScrambleKey(key);
+  const scope = options.scrambleScope ?? "metadata";
+  if (scope !== "metadata" && scope !== "all") {
+    throw new Error(`scrambleScope가 규칙을 어겼다: ${String(scope)}`);
+  }
   assertRules(rules);
   assertLimits(limits);
 
@@ -176,7 +193,7 @@ export async function encodeProjectFile(
 
   // 항목 수가 한도 안일 때만 manifest를 만든다. 디코딩은 이 상한을 넘는 manifest를 거부한다.
   const manifest = writeManifest({
-    formatVersion: FORMAT_VERSION,
+    formatVersion: formatVersionOf(scope),
     kind,
     files: manifestFiles,
   });
@@ -190,11 +207,8 @@ export async function encodeProjectFile(
     entries,
     textBytes,
   );
-  let zip: WrittenZip;
-  try {
-    zip = await writeZip(sources);
-  } catch (error) {
-    // asset 읽기 실패만 결과로 돌려준다. 그 밖의 오류는 호출자 버그라서 그대로 던진다.
+  // asset 읽기 실패만 결과로 돌려준다. 그 밖의 오류는 호출자 버그라서 그대로 던진다.
+  const readFailure = (error: unknown): ProjectFileResult<Blob> => {
     if (error instanceof ZipSourceReadError) {
       return fail({
         reason: "read-failed",
@@ -202,11 +216,25 @@ export async function encodeProjectFile(
       });
     }
     throw error;
+  };
+  let zip: WrittenZip;
+  try {
+    zip = await writeZip(sources);
+  } catch (error) {
+    return readFailure(error);
   }
   // 한도 안의 항목은 이 상한을 넘지 않는다. 넘으면 디코딩이 읽지 않는 파일이라 만들지 않는다.
   if (headerLengthOf(kind.length) + zip.length > maxProjectFileBytes(limits)) {
     return fail({ reason: "limit-exceeded", limit: "maxUncompressedBytes" });
   }
-  const parts = sealZip(zip, kind, key);
+  let parts: BlobPart[];
+  try {
+    parts =
+      scope === "all"
+        ? await sealZipWhole(zip, kind, key)
+        : sealZip(zip, kind, key);
+  } catch (error) {
+    return readFailure(error);
+  }
   return { ok: true, value: new Blob(parts, { type: PROJECT_FILE_MIME }) };
 }

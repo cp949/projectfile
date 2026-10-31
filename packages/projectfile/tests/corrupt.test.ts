@@ -148,7 +148,14 @@ describe("프로젝트 파일 손상", () => {
     patch(view, central, centralStart);
     const file = new Uint8Array(HEADER_BYTES + zip.length);
     file.set(
-      writeHeader(KIND, zip.length, 0, centralStart, keyCheckOf(DEFAULT_KEY)),
+      writeHeader(
+        KIND,
+        1,
+        zip.length,
+        0,
+        centralStart,
+        keyCheckOf(DEFAULT_KEY),
+      ),
       0,
     );
     file.set(createScrambler(DEFAULT_KEY).scramble(zip), HEADER_BYTES);

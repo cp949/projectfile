@@ -17,10 +17,15 @@ import {
   type ProjectKind,
 } from "../src/index";
 import { crc32 } from "../src/crc32";
-import { FIXED_HEADER_BYTES, readHeader } from "../src/header";
+import {
+  FIXED_HEADER_BYTES,
+  readHeader,
+  writeHeader,
+  type ScrambleScope,
+} from "../src/header";
 import { MAX_ZIP_ENTRIES } from "../src/limits";
 import { localRefsOf } from "../src/metadata-scramble";
-import { createScrambler, DEFAULT_KEY } from "../src/scramble";
+import { createScrambler, DEFAULT_KEY, keyCheckOf } from "../src/scramble";
 import { sealZip } from "../src/seal";
 import { readCentralRecords, readZipEntries, type ZipEntry } from "../src/zip";
 import type { ZipPart } from "../src/zip-write";
@@ -123,17 +128,34 @@ export async function flatten(project: {
 }
 
 /**
- * ZIP 바이트에 헤더를 붙이고 메타데이터 범위를 섞어 프로젝트 파일로 감싼다. CRC가 맞게 감싼다.
+ * ZIP 바이트에 헤더를 붙이고 섞어 프로젝트 파일로 감싼다. CRC가 맞게 감싼다.
  * `manifest.json` 항목이 하나인 코덱 모양의 ZIP이어야 한다. 항목 내용이 틀린 ZIP은 감쌀 수 있다.
- * 섞는 범위는 인코더와 같다: 로컬 헤더, manifest 본문, 중앙 디렉터리와 끝 레코드.
+ * 섞는 범위는 인코더와 같다.
+ * - `"metadata"`(기본): 로컬 헤더, manifest 본문, 중앙 디렉터리와 끝 레코드. 헤더 버전 1.
+ * - `"all"`: ZIP 전체. 헤더 CRC도 ZIP 전체를 본다. 헤더 버전 2.
  */
 export function wrap(
   zip: Uint8Array,
   kind: ProjectKind = KIND,
   key: Uint8Array = DEFAULT_KEY,
+  scope: ScrambleScope = "metadata",
 ): Uint8Array<ArrayBuffer> {
   const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
   const centralStart = view.getUint32(zip.length - 22 + 16, true);
+  if (scope === "all") {
+    const header = writeHeader(
+      kind,
+      2,
+      zip.length,
+      crc32(zip),
+      centralStart,
+      keyCheckOf(key),
+    );
+    const out = new Uint8Array(header.length + zip.length);
+    out.set(header, 0);
+    out.set(createScrambler(key).scramble(zip, 0), header.length);
+    return out;
+  }
   const records = readCentralRecords(
     zip.subarray(centralStart),
     centralStart,
@@ -178,13 +200,16 @@ export function craft(
     kind?: ProjectKind;
     manifestKind?: ProjectKind;
     dirs?: string[];
+    scope?: ScrambleScope;
+    formatVersion?: number;
   } = {},
 ): Uint8Array<ArrayBuffer> {
   const kind = options.kind ?? KIND;
   const entries: Record<string, Uint8Array | [Uint8Array, { level: 0 }]> = {
     "manifest.json": strToU8(
       JSON.stringify({
-        formatVersion: 1,
+        formatVersion:
+          options.formatVersion ?? (options.scope === "all" ? 2 : 1),
         kind: options.manifestKind ?? kind,
         files: files.map(({ path, type }) => ({ path, type: type ?? "text" })),
       }),
@@ -197,7 +222,7 @@ export function craft(
   }
   for (const dir of options.dirs ?? [])
     entries[`files/${dir}/`] = new Uint8Array(0);
-  return wrap(zipSync(entries), kind);
+  return wrap(zipSync(entries), kind, undefined, options.scope);
 }
 
 /** 중앙 디렉터리에서 `name` 항목의 `at` 위치 32비트 필드를 `value`로 고친다. 실제 데이터는 그대로다. */
@@ -272,6 +297,7 @@ export const encodeBytes = async (
   project: Project,
   kind: ProjectKind = KIND,
   scrambleKey?: Uint8Array,
+  scrambleScope?: ScrambleScope,
 ) =>
   new Uint8Array(
     await value(
@@ -281,6 +307,7 @@ export const encodeBytes = async (
         rules: RULES,
         limits: LIMITS,
         scrambleKey,
+        scrambleScope,
       }),
     ).arrayBuffer(),
   );

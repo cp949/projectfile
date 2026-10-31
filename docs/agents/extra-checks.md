@@ -9,7 +9,7 @@ Node 시험(`packages/projectfile/tests/`) 밖에서 도는 검사의 범위와 
 위치:
 
 - `vitest.browser.config.mts`: 브라우저 시험 설정. `vitest.config.mts`(Node)는 이 설정을 읽지 않고 커버리지도 Node 시험만 잰다.
-- `tests/decode-read.test.ts`, `tests/roundtrip.test.ts`: Node 시험 파일을 그대로 브라우저에서도 돈다. 파일을 복제하지 않는다.
+- `tests/decode-read.test.ts`, `tests/roundtrip.test.ts`, `tests/full-scramble.test.ts`: Node 시험 파일을 그대로 브라우저에서도 돈다. 파일을 복제하지 않는다.
 - `tests-browser/`: 브라우저에서만 돌리는 시험. 환경 단언(`environment.test.ts`), 인코딩의 `Blob` asset 읽기(`encode-blob.test.ts`), Worker 왕복(`worker-roundtrip.test.ts`, `codec.worker.ts`)이 있다.
 
 실행:
@@ -26,7 +26,7 @@ pnpm --filter @cp949/projectfile test:browser
 - 같은 시험을 두 환경에서 도는 것은 중복이 아니라 환경별 검증이다.
 - 브라우저 대상에 시험 파일을 더하려면 `vitest.browser.config.mts`의 `include`에 직접 적는다.
 - 돌리는 브라우저는 설치한 Chromium의 Chrome Headless Shell이다. headless로 띄우기 때문이다. `README.md`의 "지원 환경" 하한 브라우저는 돌리지 않는다.
-- 인코딩의 `Blob` asset CRC는 디코딩이 확인하지 않는다. asset 본문을 읽지 않기 때문이다. `encode-blob.test.ts`가 같은 내용의 `Uint8Array` 인코딩과 바이트를 비교한다.
+- 포맷 버전 1에서 인코딩의 `Blob` asset CRC는 디코딩이 확인하지 않는다. asset 본문을 읽지 않기 때문이다. `encode-blob.test.ts`가 같은 내용의 `Uint8Array` 인코딩과 바이트를 비교한다.
 
 규칙:
 
