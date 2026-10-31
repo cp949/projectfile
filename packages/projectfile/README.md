@@ -261,6 +261,10 @@ const result = await encodeProjectFile({
 ```
 
 - 디코딩은 옵션이 없다. 헤더의 포맷 버전을 보고 두 버전을 모두 연다.
+- 두 버전에 우열은 없다. 파일에 담는 내용으로 고른다. 라이브러리는 내용을 보고 고르지 않는다. 호출자가 정한다.
+  - 소스 코드를 담으면 `"all"`을 권장한다. 보안 장비가 압축되지 않은 텍스트를 보고 차단하는 일을 막는다.
+  - 이미지나 사운드처럼 소스 코드를 담지 않으면 `"metadata"`를 권장한다. asset을 한 번 더 읽지 않고 입력의 `slice`를 그대로 쓴다.
+  - 소스 코드를 asset 항목으로 담는 경우도 소스 코드를 담는 경우다. 버전 1은 asset을 압축하지 않고 섞지도 않는다.
 - 버전 1은 텍스트와 asset 본문을 섞지 않아서 평문이 남는 경우가 있다. 비 ASCII 텍스트의 stored 블록과 asset 원본이다. 버전 2는 남지 않는다.
 - 버전 2는 입력 전체를 읽는다. 인코딩은 asset을 두 번 읽고, 디코딩은 payload 전체와 asset 본문을 읽는다.
   - Node에서 64 MiB asset 하나를 한 번 잰 값이다. 인코딩은 버전 1이 107 ms, 버전 2가 278 ms였다. 디코딩은 6 ms와 332 ms였다([ADR-0007](https://github.com/cp949/projectfile/blob/main/docs/adr/0007-full-scramble-version.md)).
